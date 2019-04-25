@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 import torch
 from pysc2.lib import actions
 

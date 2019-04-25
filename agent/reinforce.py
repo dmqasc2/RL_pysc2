@@ -21,27 +21,6 @@ class Learner:
         self.saved_log_probs_nonspatial = []
         self.rewards = []
 
-    def process_obs(self, obs):
-        obs = np.array(obs, dtype='float32')
-        obs = np.expand_dims(obs, axis=0)
-        obs = torch.from_numpy(obs)
-        return obs
-
-    def process_action(self, actions):
-        actions = np.argmax(actions, axis=-1)
-        actions = actions.reshape(-1)
-        return actions
-
-    def process_reward(self, rewards):
-        rewards = np.array(rewards, dtype='float32')
-        rewards = torch.from_numpy(rewards)
-        return rewards
-
-    def process_done(self, done):
-        done = np.array(done, dtype='float32')
-        done = torch.from_numpy(done)
-        return done
-
     def preprocess_available_actions(self, available_actions, max_action=len(Actions.FUNCTIONS)):
         a_actions = np.zeros((max_action), dtype='float32')
         a_actions[available_actions] = 1.
