@@ -7,6 +7,7 @@ from __future__ import print_function
 from pysc2.agents import random_agent
 from pysc2.env import sc2_env
 from pysc2.env.environment import StepType
+from pysc2.lib import actions
 
 from absl import app
 from absl import flags
@@ -20,6 +21,7 @@ nb_max_steps = 2000
 FLAGS = flags.FLAGS
 FLAGS(sys.argv)
 flags.DEFINE_bool("render", False, "Whether to render with pygame.")
+flags.DEFINE_float("fps", 1, "Frames per second to run the game.")
 
 agent_format = sc2_env.AgentInterfaceFormat(
     feature_dimensions=sc2_env.Dimensions(
@@ -57,14 +59,23 @@ def run(env_name):
         '''
         agent.reset()
         while True:
-            actions = agent.step(obs)
+            a = agent.step(obs)
             ###
             function_id = np.random.choice(obs.observation.available_actions)
+            function_id = 3
             args = [[np.random.randint(0, size) for size in arg.sizes]
                     for arg in agent.action_spec.functions[function_id].args]
-            actions = actions.FunctionCall(function_id, args)
+            a = actions.FunctionCall(function_id, args)
+            agent.action_spec.functions[function_id].args
+
+            obs.observation.available_actions
             ###
-            obs = env.step(actions=[actions])[0]
+            a = actions.FunctionCall(12, [[0], [12, 12]])
+            obs = env.step(actions=[a])[0]
+
+            a = actions.FunctionCall(0, [])
+            obs = env.step(actions=[a])[0]
+
             reward[-1] += obs.reward
             if obs.last():
                 cum_reward = obs.observation["score_cumulative"]

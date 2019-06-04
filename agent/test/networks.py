@@ -7,6 +7,8 @@ https://github.com/wing3s/pysc2-rl-mini/blob/master/rl/model.py
 '''
 
 import math
+from math import floor
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,6 +16,16 @@ import torch.nn.functional as F
 from torch.nn import init
 from torch.nn.utils import weight_norm
 from torch.autograd import Variable
+
+from pysc2.lib import actions
+from pysc2.lib import features
+
+import numpy as np
+
+
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.view(input.size(0), -1)
 
 
 def init_weights(model):
@@ -25,83 +37,101 @@ def init_weights(model):
         init.constant_(model.bias_hh, 0)
 
 
-class FullyConv(torch.nn.Module):
+def make_one_hot_1d(labels, dtype, C=2):
+    '''
+    Reference: https://lirnli.wordpress.com/2017/09/03/one-hot-encoding-in-pytorch/
+    Parameters
+    ----------
+    labels : N, where N is batch size.
+    dtype: Cuda or not
+    C : number of classes in labels.
+
+    Returns
+    -------
+    target : N x C
+    '''
+    out = Variable(dtype(labels.size(0), C).zero_())
+    index = labels.contiguous().view(-1, 1).long()
+    return out.scatter_(1, index, 1)
+
+
+class AtariNet(torch.nn.Module):
     def __init__(self,
                  minimap_channels,
                  screen_channels,
                  screen_resolution,
-                 num_action,
-                 enable_lstm=True):
-        super(FullyConv, self).__init__()
-        self.enable_lstm = enable_lstm
+                 nonspatial_obs_dim,
+                 num_action):
+        super(AtariNet, self).__init__()
 
+        # spatial features
         # apply paddinga as 'same', padding = (kernel - 1)/2
-        self.mconv1 = nn.Conv2d(minimap_channels, 16, 5, stride=1, padding=2)  # shape (N, 16, m, m)
-        self.mconv2 = nn.Conv2d(16, 32, 3, stride=1, padding=1)  # shape (N, 32, m, m)
-        self.sconv1 = nn.Conv2d(screen_channels, 16, 5, stride=1, padding=2)  # shape (N, 16, s, s)
-        self.sconv2 = nn.Conv2d(16, 32, 3, stride=1, padding=1)  # shape (N, 32, s, s)
+        self.minimap_conv_layers = nn.Sequential(
+            nn.Conv2d(minimap_channels, 16, 8, stride=4),  # shape (N, 16, m, m)
+            nn.ReLU(),
+            nn.Conv2d(16, 32, 4, stride=2),  # shape (N, 32, m, m)
+            nn.ReLU(),
+            Flatten()
+        )
 
-        # spatial actor
-        state_channels = 32 * 2 + 1  # stacking minimap, screen, info
-        self.sa_conv3 = nn.Conv2d(state_channels, 1, 1, stride=1)  # shape (N, 65, s, s)
+        self.screen_conv_layers = nn.Sequential(
+            nn.Conv2d(screen_channels, 16, 8, stride=4),  # shape (N, 16, m, m)
+            nn.ReLU(),
+            nn.Conv2d(16, 32, 4, stride=2),  # shape (N, 32, m, m)
+            nn.ReLU(),
+            Flatten()
+        )
 
-        # non spatial feature
-        self.ns_fc3 = nn.Linear(
-            screen_resolution * screen_resolution * state_channels, 256)
-        # non spatial actor
-        self.nsa_fc4 = nn.Linear(256, num_action)
-        # non spatial critic
-        self.nsc_fc4 = nn.Linear(256, 1)
+        # non-spatial features
+        self.nonspatial_dense = nn.Sequential(
+            nn.Linear(nonspatial_obs_dim, 256),
+            nn.Tanh()
+        )
 
-        self.apply(init_weights)
-        self.train()
+        # calculated conv. output shape for input resolutions
+        shape_conv = self._conv_output_shape(screen_resolution, kernel_size=8, stride=4)
+        shape_conv = self._conv_output_shape(shape_conv, kernel_size=4, stride=2)
 
-    def forward(self, minimap_vb, screen_vb, info_vb, valid_action_vb, lstm_hidden_vb=None):
-        """
-            Args:
-                minimap_vb, (N, # of channel, width, height)
-                screen_vb, (N, # of channel, width, height)
-                info_vb, (len(info))
-                valid_action_vb, (len(observation['available_actions])) same as (num_actions)
-            Returns:
-                value_vb, (1, 1)
-                spatial_policy_vb, (1, s*s)
-                non_spatial_policy_vb, (1, num_actions)
-                lstm_hidden variables
-            TODO: implement lstm
-        """
-        x_m = F.relu(self.mconv1(minimap_vb))
-        x_m = F.relu(self.mconv2(x_m))
-        x_s = F.relu(self.sconv1(screen_vb))
-        x_s = F.relu(self.sconv2(x_s))
+        # state representations
+        self.layer_hidden = nn.Sequential(nn.Linear(32 * shape_conv[0] * shape_conv[1] + 256, 256),
+                                          nn.ReLU()
+                                         )
+        # output layers
+        self.layer_value = nn.Linear(256, 1)
+        self.layer_action = nn.Linear(256, num_action)
+        self.layer_screen1_x = nn.Linear(256, screen_resolution[0])
+        self.layer_screen1_y = nn.Linear(256, screen_resolution[1])
+        self.layer_screen2_x = nn.Linear(256, screen_resolution[0])
+        self.layer_screen2_y = nn.Linear(256, screen_resolution[1])
 
-        x_i = Variable(
-            info_vb.data.repeat(
-                math.ceil(x_s.shape[2] * x_s.shape[3] / info_vb.shape[0])
-            ).resize_(
-                x_s.shape[2], x_s.shape[3]
-            )
-        )  # transform info vector into 2d matrix with shape (s, s) filled with repeat values
-        x_i = x_i.unsqueeze(0).unsqueeze(0)  # shape (1, 1, s, s)
-        x_state = torch.cat((x_m, x_s, x_i), dim=1)  # concat along channel dimension
+        self.apply(init_weights)  # weight initialization
+        self.train()  # train mode
 
-        x_spatial = self.sa_conv3(x_state)
-        x_spatial = x_spatial.view(x_spatial.shape[0], -1)
-        spatial_policy_vb = F.softmax(x_spatial, dim=1)
+    def forward(self, obs_minimap, obs_screen, obs_nonspatial, valid_actions):
+        # process observations
+        m = self.minimap_conv_layers(obs_minimap)
+        s = self.screen_conv_layers(obs_screen)
+        n = self.nonspatial_dense(obs_nonspatial)
 
-        x_non_spatial = x_state.view(x_state.shape[0], -1)
-        x_non_spatial = F.relu(self.ns_fc3(x_non_spatial))
+        state_representation = self.layer_hidden(torch.cat([m, s, n]))
+        v = self.layer_value(state_representation)
+        pol_categorical = self.layer_action(state_representation)
+        pol_categorical = self._mask_unavailable_actions(pol_categorical)
+        pol_screen1_x = self.layer_screen1_x(state_representation)
+        pol_screen1_y = self.layer_screen1_y(state_representation)
+        pol_screen2_x = self.layer_screen2_x(state_representation)
+        pol_screen2_y = self.layer_screen2_y(state_representation)
 
-        x_non_spatial_policy = self.nsa_fc4(x_non_spatial)
-        non_spatial_policy_vb = F.softmax(x_non_spatial_policy, dim=1)
-        non_spatial_policy_vb = self._mask_unavailable_actions(
-            non_spatial_policy_vb, valid_action_vb)
+        return v, pol_categorical, pol_screen1_x, pol_screen1_y, pol_screen2_x, pol_screen2_y
 
-        value_vb = self.nsc_fc4(x_non_spatial)
+    def _conv_output_shape(self, h_w, kernel_size=1, stride=1, pad=0, dilation=1):
+        if type(kernel_size) is not tuple:
+            kernel_size = (kernel_size, kernel_size)
+        h = floor(((h_w[0] + (2 * pad) - (dilation * (kernel_size[0] - 1)) - 1) / stride) + 1)
+        w = floor(((h_w[1] + (2 * pad) - (dilation * (kernel_size[1] - 1)) - 1) / stride) + 1)
+        return h, w
 
-        return value_vb, spatial_policy_vb, non_spatial_policy_vb, None
-
-    def _mask_unavailable_actions(self, policy_vb, valid_action_vb):
+    def _mask_unavailable_actions(self, policy, valid_actions):
         """
             Args:
                 policy_vb, (1, num_actions)
@@ -109,6 +139,125 @@ class FullyConv(torch.nn.Module):
             Returns:
                 masked_policy_vb, (1, num_actions)
         """
-        masked_policy_vb = policy_vb * valid_action_vb
+        masked_policy_vb = policy * valid_actions
         masked_policy_vb /= masked_policy_vb.sum(1)
         return masked_policy_vb
+
+
+class FullyConvNet(torch.nn.Module):
+    def __init__(self,
+                 minimap_channels,
+                 screen_channels,
+                 screen_resolution,
+                 nonspatial_obs_dim,
+                 num_action):
+        super(FullyConvNet, self).__init__()
+
+        # spatial features
+        # apply paddinga as 'same', padding = (kernel - 1)/2
+        self.minimap_conv_layers = nn.Sequential(
+            nn.Conv2d(minimap_channels, 16, 5, stride=1, padding=2),  # shape (N, 16, m, m)
+            nn.ReLU(),
+            nn.Conv2d(16, 32, 3, stride=1, padding=1),  # shape (N, 32, m, m)
+            nn.ReLU()
+        )
+
+        self.screen_conv_layers = nn.Sequential(
+            nn.Conv2d(minimap_channels, 16, 5, stride=1, padding=2),  # shape (N, 16, m, m)
+            nn.ReLU(),
+            nn.Conv2d(16, 32, 3, stride=1, padding=1),  # shape (N, 32, m, m)
+            nn.ReLU()
+        )
+
+        # non-spatial features
+        self.nonspatial_dense = nn.Sequential(
+            nn.Linear(nonspatial_obs_dim, 256),
+            nn.Tanh()
+        )
+        # broadcast_out = flat_emb.unsqueeze(2).unsqueeze(3). \
+        #     expand(flat_emb.size(0), flat_emb.size(1), resolution, resolution)
+        #
+        # state_out = torch.cat([screen_out.float(), minimap_out.float(), broadcast_out.float()], dim=1)
+        # flat_out = state_out.view(state_out.size(0), -1)
+        # fc = self.fc(flat_out)
+
+        # calculated conv. output shape for input resolutions
+        shape_conv = self._conv_output_shape(screen_resolution, kernel_size=8, stride=4)
+        shape_conv = self._conv_output_shape(shape_conv, kernel_size=4, stride=2)
+
+        # state representations
+        self.layer_hidden = nn.Sequential(nn.Linear(32 * shape_conv[0] * shape_conv[1] + 256, 256),
+                                          nn.ReLU()
+                                          )
+        # output layers
+        self.layer_value = nn.Linear(256, 1)
+        self.layer_action = nn.Linear(256, num_action)
+        self.layer_screen1_x = nn.Linear(256, screen_resolution[0])
+        self.layer_screen1_y = nn.Linear(256, screen_resolution[1])
+        self.layer_screen2_x = nn.Linear(256, screen_resolution[0])
+        self.layer_screen2_y = nn.Linear(256, screen_resolution[1])
+
+        self.apply(init_weights)  # weight initialization
+        self.train()  # train mode
+
+    def forward(self, obs_minimap, obs_screen, obs_nonspatial, valid_actions):
+        # process observations
+        m = self.minimap_conv_layers(obs_minimap)
+        s = self.screen_conv_layers(obs_screen)
+        n = self.nonspatial_dense(obs_nonspatial)
+
+        state_representation = self.layer_hidden(torch.cat([m, s, n]))
+        v = self.layer_value(state_representation)
+        pol_categorical = self.layer_action(state_representation)
+        pol_categorical = self._mask_unavailable_actions(pol_categorical)
+        pol_screen1_x = self.layer_screen1_x(state_representation)
+        pol_screen1_y = self.layer_screen1_y(state_representation)
+        pol_screen2_x = self.layer_screen2_x(state_representation)
+        pol_screen2_y = self.layer_screen2_y(state_representation)
+
+        return v, pol_categorical, pol_screen1_x, pol_screen1_y, pol_screen2_x, pol_screen2_y
+
+    def _conv_output_shape(self, h_w, kernel_size=1, stride=1, pad=0, dilation=1):
+        if type(kernel_size) is not tuple:
+            kernel_size = (kernel_size, kernel_size)
+        h = floor(((h_w[0] + (2 * pad) - (dilation * (kernel_size[0] - 1)) - 1) / stride) + 1)
+        w = floor(((h_w[1] + (2 * pad) - (dilation * (kernel_size[1] - 1)) - 1) / stride) + 1)
+        return h, w
+
+    def _mask_unavailable_actions(self, policy, valid_actions):
+        """
+            Args:
+                policy_vb, (1, num_actions)
+                valid_action_vb, (num_actions)
+            Returns:
+                masked_policy_vb, (1, num_actions)
+        """
+        masked_policy_vb = policy * valid_actions
+        masked_policy_vb /= masked_policy_vb.sum(1)
+        return masked_policy_vb
+
+    def _log_transform(self, x, scale):
+        return torch.log(8 * x / scale + 1)
+
+    def _embed_obs(self, obs, spec, networks, one_hot):
+        """
+            Embed observation channels
+        """
+        # Channel dimension is 1
+        feats = torch.chunk(obs, len(spec), dim=1)
+        out_list = []
+        for feat, s in zip(feats, spec):
+            if s.type == features.FeatureType.CATEGORICAL:
+                dims = np.round(np.log2(s.scale)).astype(np.int32).item()
+                dims = max(dims, 1)
+                indices = one_hot(feat, self.dtype, C=s.scale)
+                out = networks[s.index](indices.float())
+            elif s.type == features.FeatureType.SCALAR:
+                out = self._log_transform(feat, s.scale)
+            else:
+                raise NotImplementedError
+            out_list.append(out)
+        # Channel dimension is 1
+        return torch.cat(out_list, 1)
+
+
