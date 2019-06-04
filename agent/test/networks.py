@@ -237,11 +237,13 @@ class FullyConvNet(torch.nn.Module):
         return masked_policy_vb
 
     def _log_transform(self, x, scale):
+        # TODO: move to preprocessing
         return torch.log(8 * x / scale + 1)
 
     def _embed_obs(self, obs, spec, networks, one_hot):
         """
             Embed observation channels
+            TODO: move to preprocessing
         """
         # Channel dimension is 1
         feats = torch.chunk(obs, len(spec), dim=1)
