@@ -69,6 +69,9 @@ def run(env_name):
             agent.action_spec.functions[function_id].args
 
             obs.observation.available_actions
+            len(obs)
+            obs[3]
+
             ###
             a = actions.FunctionCall(12, [[0], [12, 12]])
             obs = env.step(actions=[a])[0]

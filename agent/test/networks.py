@@ -113,6 +113,8 @@ class AtariNet(torch.nn.Module):
         s = self.screen_conv_layers(obs_screen)
         n = self.nonspatial_dense(obs_nonspatial)
 
+        m = m.view(m.size(0), -1)
+        s = s.view(s.size(0), -1)
         state_representation = self.layer_hidden(torch.cat([m, s, n]))
         v = self.layer_value(state_representation)
         pol_categorical = self.layer_action(state_representation)
@@ -163,7 +165,7 @@ class FullyConvNet(torch.nn.Module):
         )
 
         self.screen_conv_layers = nn.Sequential(
-            nn.Conv2d(minimap_channels, 16, 5, stride=1, padding=2),  # shape (N, 16, m, m)
+            nn.Conv2d(screen_channels, 16, 5, stride=1, padding=2),  # shape (N, 16, m, m)
             nn.ReLU(),
             nn.Conv2d(16, 32, 3, stride=1, padding=1),  # shape (N, 32, m, m)
             nn.ReLU()
@@ -174,28 +176,20 @@ class FullyConvNet(torch.nn.Module):
             nn.Linear(nonspatial_obs_dim, 256),
             nn.Tanh()
         )
-        # broadcast_out = flat_emb.unsqueeze(2).unsqueeze(3). \
-        #     expand(flat_emb.size(0), flat_emb.size(1), resolution, resolution)
-        #
-        # state_out = torch.cat([screen_out.float(), minimap_out.float(), broadcast_out.float()], dim=1)
-        # flat_out = state_out.view(state_out.size(0), -1)
-        # fc = self.fc(flat_out)
 
         # calculated conv. output shape for input resolutions
         shape_conv = self._conv_output_shape(screen_resolution, kernel_size=8, stride=4)
         shape_conv = self._conv_output_shape(shape_conv, kernel_size=4, stride=2)
 
         # state representations
-        self.layer_hidden = nn.Sequential(nn.Linear(32 * shape_conv[0] * shape_conv[1] + 256, 256),
+        self.layer_hidden = nn.Sequential(nn.Linear(2 * 32 * shape_conv[0] * shape_conv[1], 256),
                                           nn.ReLU()
                                           )
         # output layers
         self.layer_value = nn.Linear(256, 1)
         self.layer_action = nn.Linear(256, num_action)
-        self.layer_screen1_x = nn.Linear(256, screen_resolution[0])
-        self.layer_screen1_y = nn.Linear(256, screen_resolution[1])
-        self.layer_screen2_x = nn.Linear(256, screen_resolution[0])
-        self.layer_screen2_y = nn.Linear(256, screen_resolution[1])
+        self.layer_screen1 = nn.Conv2d(64, 1, 1)
+        self.layer_screen2 = nn.Conv2d(64, 1, 1)
 
         self.apply(init_weights)  # weight initialization
         self.train()  # train mode
@@ -204,18 +198,19 @@ class FullyConvNet(torch.nn.Module):
         # process observations
         m = self.minimap_conv_layers(obs_minimap)
         s = self.screen_conv_layers(obs_screen)
-        n = self.nonspatial_dense(obs_nonspatial)
+        # n = self.nonspatial_dense(obs_nonspatial)
 
-        state_representation = self.layer_hidden(torch.cat([m, s, n]))
-        v = self.layer_value(state_representation)
-        pol_categorical = self.layer_action(state_representation)
+        state_representation = torch.cat([m, s], dim=1)
+        state_representation_dense = self.layer_hidden(state_representation)
+        v = self.layer_value(state_representation_dense)
+        pol_categorical = self.layer_action(state_representation_dense)
         pol_categorical = self._mask_unavailable_actions(pol_categorical)
-        pol_screen1_x = self.layer_screen1_x(state_representation)
-        pol_screen1_y = self.layer_screen1_y(state_representation)
-        pol_screen2_x = self.layer_screen2_x(state_representation)
-        pol_screen2_y = self.layer_screen2_y(state_representation)
 
-        return v, pol_categorical, pol_screen1_x, pol_screen1_y, pol_screen2_x, pol_screen2_y
+        # conv. output
+        pol_screen1 = self.layer_screen1_x(state_representation)
+        pol_screen2 = self.layer_screen2_x(state_representation)
+
+        return v, pol_categorical, pol_screen1, pol_screen2
 
     def _conv_output_shape(self, h_w, kernel_size=1, stride=1, pad=0, dilation=1):
         if type(kernel_size) is not tuple:
@@ -236,30 +231,6 @@ class FullyConvNet(torch.nn.Module):
         masked_policy_vb /= masked_policy_vb.sum(1)
         return masked_policy_vb
 
-    def _log_transform(self, x, scale):
-        # TODO: move to preprocessing
-        return torch.log(8 * x / scale + 1)
 
-    def _embed_obs(self, obs, spec, networks, one_hot):
-        """
-            Embed observation channels
-            TODO: move to preprocessing
-        """
-        # Channel dimension is 1
-        feats = torch.chunk(obs, len(spec), dim=1)
-        out_list = []
-        for feat, s in zip(feats, spec):
-            if s.type == features.FeatureType.CATEGORICAL:
-                dims = np.round(np.log2(s.scale)).astype(np.int32).item()
-                dims = max(dims, 1)
-                indices = one_hot(feat, self.dtype, C=s.scale)
-                out = networks[s.index](indices.float())
-            elif s.type == features.FeatureType.SCALAR:
-                out = self._log_transform(feat, s.scale)
-            else:
-                raise NotImplementedError
-            out_list.append(out)
-        # Channel dimension is 1
-        return torch.cat(out_list, 1)
 
 
