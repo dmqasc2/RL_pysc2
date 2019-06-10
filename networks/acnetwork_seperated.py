@@ -90,7 +90,11 @@ class ActorNet(torch.nn.Module):
         self.apply(init_weights)  # weight initialization
         self.train()  # train mode
 
-    def forward(self, obs_minimap, obs_screen, obs_nonspatial, valid_actions):
+    def forward(self, obs, valid_actions):
+        obs_minimap = obs['minimap']
+        obs_screen = obs['screen']
+        obs_nonspatial = obs['nonspatial']
+        
         # process observations
         m = self.minimap_conv_layers(obs_minimap)
         s = self.screen_conv_layers(obs_screen)
@@ -100,7 +104,7 @@ class ActorNet(torch.nn.Module):
         state_representation_dense = self.layer_hidden(state_representation)
         v = self.layer_value(state_representation_dense)
         pol_categorical = self.layer_action(state_representation_dense)
-        pol_categorical = self._mask_unavailable_actions(pol_categorical)
+        pol_categorical = self._mask_unavailable_actions(pol_categorical, valid_actions)
 
         # conv. output
         pol_screen1 = self.layer_screen1_x(state_representation)
