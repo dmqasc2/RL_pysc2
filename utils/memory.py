@@ -87,7 +87,6 @@ class Memory(object):
                      'screen': np.array(obs1_batch['screen']),
                      'nonspatial': array_min2d(obs1_batch['nonspatial'])},
             'rewards': array_min2d(reward_batch),
-            'actions': array_min2d(action_batch),
             'actions': {'categorical': array_min2d(action_batch['categorical']),
                         'screen1': array_min2d(action_batch['screen1']),
                         'screen2': array_min2d(action_batch['screen2'])},
