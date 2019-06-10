@@ -6,6 +6,11 @@ from utils import arglist
 
 
 class Agent(object):
+    def preprocess_available_actions(self, available_actions, max_action=arglist.NUM_ACTIONS):
+        a_actions = np.zeros((max_action), dtype='float32')
+        a_actions[available_actions] = 1.
+        return a_actions
+
     def select_action(self, logits):
         '''
         from logit to pysc2 actions
@@ -18,8 +23,8 @@ class Agent(object):
         pos_screen1 = gumbel_softmax(logits['screen1'].view(1, -1), hard=True).argmax().item()
         pos_screen2 = gumbel_softmax(logits['screen2'].view(1, -1), hard=True).argmax().item()
 
-        pos = [[int(pos_screen1 % arglist.FEAT2DSIZE),int(pos_screen1 // arglist.FEAT2DSIZE)],
-               [int(pos_screen2 % arglist.FEAT2DSIZE),int(pos_screen2 // arglist.FEAT2DSIZE)]]  # (x, y)
+        pos = [[int(pos_screen1 % arglist.FEAT2DSIZE), int(pos_screen1 // arglist.FEAT2DSIZE)],
+               [int(pos_screen2 % arglist.FEAT2DSIZE), int(pos_screen2 // arglist.FEAT2DSIZE)]]  # (x, y)
 
         args = []
         cnt = 0

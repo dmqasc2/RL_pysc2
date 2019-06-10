@@ -5,9 +5,10 @@ import copy
 from pysc2.lib import actions
 from torch.nn.functional import gumbel_softmax
 from utils import arglist
+from agent.agent import Agent
 
 
-class DDPGAgent:
+class DDPGAgent(Agent):
     def __init__(self, actor, critic, memory):
         """
         DDPG learning for seperated actor & critic networks.
@@ -29,52 +30,31 @@ class DDPGAgent:
         self.target_actor.eval()
         self.target_critic.eval()
 
-    def preprocess_available_actions(self, available_actions, max_action=arglist.NUM_ACTIONS):
-        a_actions = np.zeros((max_action), dtype='float32')
-        a_actions[available_actions] = 1.
-        return a_actions
-
-    def select_action(self, logits):
-        '''
-        from logit to pysc2 actions
-        :param logits: {'categorical': [], 'screen1': [], 'screen2': []}
-        :return: FunctionCall form of action
-        '''
-        function_id = gumbel_softmax(logits['categorical'], hard=True)
-        function_id = function_id.argmax().item()
-
-        pos_screen1 = gumbel_softmax(logits['screen1'].view(1, -1), hard=True).argmax().item()
-        pos_screen2 = gumbel_softmax(logits['screen2'].view(1, -1), hard=True).argmax().item()
-
-        pos = [[int(pos_screen1 % arglist.FEAT2DSIZE), int(pos_screen1 // arglist.FEAT2DSIZE)],
-               [int(pos_screen2 % arglist.FEAT2DSIZE), int(pos_screen2 // arglist.FEAT2DSIZE)]]  # (x, y)
-
-        args = []
-        cnt = 0
-        for arg in actions.FUNCTIONS[function_id].args:
-            if arg.name in ['screen', 'screen2', 'minimap']:
-                args.append(pos[cnt])
-                cnt += 1
+    def process_batch(self):
+        """
+        Transforms numpy replays to torch tensor
+        :return: dict of torch.tensor
+        """
+        replays = self.memory.sample(arglist.BatchSize)
+        batch = {}
+        for key in replays:
+            batch[key] = {}
+            if type(replays[key]) is dict:
+                for subkey in replays[key]:
+                    # process
+                    batch[key][subkey] = torch.tensor(replays[key][subkey], dtype=torch.float32).to(self.device)
             else:
-                args.append([0])
+                # process
+                batch[key] = torch.tensor(replays[key], dtype=torch.float32).to(self.device)
 
-        action = actions.FunctionCall(function_id, args)
-        return action
+        return batch['obs0'], batch['actions'], batch['rewards'], batch['obs1'], batch['terminals1']
 
     def optimize(self):
         """
         Samples a random batch from replay memory and performs optimization
         :return:
         """
-        # experiences = self.memory.sample(arglist.batch_size)
         s0, a0, r, s1, d = self.process_batch()
-
-        s0 = s0.to(self.device)
-        a0 = a0.to(self.device)
-        r = r.to(self.device)
-        s1 = s1.to(self.device)
-        d = d.to(self.device)
-
         # ---------------------- optimize critic ----------------------
         # Use target actor exploitation policy here for loss evaluation
         logits1, _ = self.target_actor.forward(s1)

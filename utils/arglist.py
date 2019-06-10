@@ -11,3 +11,5 @@ EPS = np.finfo(np.float32).eps.item()
 GAMMA = 0.99
 TAU = 0.001
 LEARNINGRATE = 0.001
+
+BatchSize = 32
