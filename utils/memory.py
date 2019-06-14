@@ -3,10 +3,10 @@ import numpy as np
 
 class RingBuffer(object):
     def __init__(self, maxlen, shape, dtype='float32'):
-        self.maxlen = maxlen
+        self.maxlen = int(maxlen)
         self.start = 0
         self.length = 0
-        self.data = np.zeros((maxlen,) + shape).astype(dtype)
+        self.data = np.zeros((self.maxlen,) + shape).astype(dtype)
 
     def __len__(self):
         return self.length

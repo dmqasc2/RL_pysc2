@@ -1,8 +1,6 @@
 import torch
-import numpy as np
 import shutil
 import copy
-from pysc2.lib import actions
 from torch.nn.functional import gumbel_softmax
 from utils import arglist
 from agent.agent import Agent
@@ -49,6 +47,19 @@ class DDPGAgent(Agent):
 
         return batch['obs0'], batch['actions'], batch['rewards'], batch['obs1'], batch['terminals1']
 
+    def gumbel_softmax_hard(self, x):
+        shape = x.shape
+        if len(shape) == 4:
+            # merge batch and seq dimensions
+            x_reshape = x.contiguous().view(shape[0], -1)
+            y = torch.nn.functional.gumbel_softmax(x_reshape, hard=True, dim=-1)
+            # We have to reshape Y
+            y = y.contiguous().view(shape)
+        else:
+            y = torch.nn.functional.gumbel_softmax(x, hard=True, dim=-1)
+
+        return y
+
     def optimize(self):
         """
         Samples a random batch from replay memory and performs optimization
@@ -57,30 +68,21 @@ class DDPGAgent(Agent):
         s0, a0, r, s1, d = self.process_batch()
         # ---------------------- optimize critic ----------------------
         # Use target actor exploitation policy here for loss evaluation
-        logits1, _ = self.target_actor.forward(s1)
-        # a1 = torch.eye(self.nb_actions)[torch.argmax(logits1, -1)].to(self.device)
-        if self.action_type == 'Discrete':
-            a1 = self.gumbel_softmax(logits1)
-        elif self.action_type == 'MultiDiscrete':
-            a1 = [self.gumbel_softmax(x) for x in logits1]
-            a1 = torch.cat(a1, dim=-1)
+        logits1 = self.target_actor.forward(s1)
+        a1 = [self.gumbel_softmax_hard(x) for x in logits1]
 
-        q_next, _ = self.target_critic.forward(s1, a1)
+        q_next = self.target_critic.forward(s1, a1)
         q_next = q_next.detach()
         q_next = torch.squeeze(q_next)
         # Loss: TD error
         # y_exp = r + gamma*Q'( s1, pi'(s1))
         y_expected = r + arglist.GAMMA * q_next * (1. - d)
         # y_pred = Q( s0, a0)
-        y_predicted, pred_r = self.critic.forward(s0, a0)
+        y_predicted = self.critic.forward(s0, a0)
         y_predicted = torch.squeeze(y_predicted)
-        pred_r = torch.squeeze(pred_r)
 
         # Sum. Loss
-        critic_TDLoss = torch.nn.SmoothL1Loss()(y_predicted, y_expected)
-        critic_ModelLoss = torch.nn.L1Loss()(pred_r, r)
-        loss_critic = critic_TDLoss
-        loss_critic += critic_ModelLoss
+        loss_critic = torch.nn.SmoothL1Loss()(y_predicted, y_expected)
 
         # Update critic
         self.critic_optimizer.zero_grad()
@@ -89,17 +91,8 @@ class DDPGAgent(Agent):
         self.critic_optimizer.step()
 
         # ---------------------- optimize actor ----------------------
-        pred_logits0, pred_s1 = self.actor.forward(s0)
-        if self.action_type == 'Discrete':
-            pred_a0 = self.gumbel_softmax(pred_logits0)
-            # pred_a0 = torch.nn.Softmax(dim=-1)(pred_logits0)
-        elif self.action_type == 'MultiDiscrete':
-            pred_a0 = [self.gumbel_softmax(x) for x in pred_logits0]
-            pred_a0 = torch.cat(pred_a0, dim=-1)
-
-        # Loss: entropy for exploration
-        # pred_a0_prob = torch.nn.functional.softmax(pred_logits0, dim=-1)
-        # entropy = torch.sum(pred_a0 * torch.log(pred_a0 + 1e-10), dim=-1).mean()
+        pred_logits0 = self.actor.forward(s0)
+        pred_a0 = [self.gumbel_softmax_hard(x) for x in pred_logits0]
 
         # Loss: regularization
         l2_reg = torch.cuda.FloatTensor(1)
@@ -107,20 +100,15 @@ class DDPGAgent(Agent):
             l2_reg = l2_reg + W.norm(2)
 
         # Loss: max. Q
-        Q, _ = self.critic.forward(s0, pred_a0)
+        Q = self.critic.forward(s0, pred_a0)
         actor_maxQ = -1 * Q.mean()
-
-        # Loss: env loss
-        actor_ModelLoss = torch.nn.L1Loss()(pred_s1, s1)
 
         # Sum. Loss
         loss_actor = actor_maxQ
-        # loss_actor += entropy * 0.05  # <replace Gaussian noise>
         loss_actor += torch.squeeze(l2_reg) * 1e-3
-        loss_actor += actor_ModelLoss
 
         # Update actor
-        # run random noise to exploration
+        # runs random noise to exploration
         self.actor.train()
         self.actor_optimizer.zero_grad()
         loss_actor.backward()

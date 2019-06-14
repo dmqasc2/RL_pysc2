@@ -21,7 +21,7 @@ nb_max_steps = 2000
 FLAGS = flags.FLAGS
 FLAGS(sys.argv)
 flags.DEFINE_bool("render", False, "Whether to render with pygame.")
-flags.DEFINE_float("fps", 1, "Frames per second to run the game.")
+flags.DEFINE_float("fps", 1, "Frames per second to runs the game.")
 
 agent_format = sc2_env.AgentInterfaceFormat(
     feature_dimensions=sc2_env.Dimensions(
