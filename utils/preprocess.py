@@ -23,6 +23,24 @@ class Preprocess:
         return act
 
     def postprocess_action(self, act):
+        '''
+        input: action <FunctionCall>
+        output: action <dict of np.array>
+        '''
+        act_categorical = np.zeros(shape=(arglist.NUM_ACTIONS,), dtype='float32')
+        act_categorical[act.function] = 1.
+
+        act_screens = [np.zeros(shape=(1, arglist.FEAT2DSIZE, arglist.FEAT2DSIZE), dtype='float32')] * 2
+        i = 0
+        for arg in act.arguments:
+            if arg != [0]:
+                act_screens[i][0, arg[0], arg[1]] = 1.
+                i += 1
+
+        act = {'categorical': act_categorical,
+               'screen1': act_screens[0],
+               'screen2': act_screens[1]}
+
         return act
 
     def _onehot1d(self, x):

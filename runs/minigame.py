@@ -22,7 +22,7 @@ class MiniGame:
         self.learner = learner
         self.preprocess = preprocess
 
-    def run(self):
+    def run(self, is_training=True):
         reward_cumulative = []
         for i_episode in range(self.nb_episodes):
             state = self.env.reset()[0]
@@ -30,12 +30,18 @@ class MiniGame:
                 obs = self.preprocess.get_observation(state)
                 actions = self.learner.select_action(obs, valid_actions=obs['nonspatial'])
                 state = self.env.step(actions=[actions])[0]
-
+                obs_new = self.preprocess.get_observation(state)
+                # memory
+                actions = self.preprocess.postprocess_action(actions)
+                self.learner.memory.append(obs0=obs, action=actions, reward=state.reward,
+                                           obs1=obs_new, terminal1=state.last(), training=is_training)
+                self.learner.optimize()
+                self.learner.memory.nb_entries
                 if state.last():
                     cum_reward = state.observation["score_cumulative"]
                     reward_cumulative.append(cum_reward[0])
                     break
-                self.learner.optimize()
+
 
         self.env.close()
         print(reward_cumulative)

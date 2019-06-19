@@ -27,10 +27,10 @@ def main(_):
         critic = CriticNet()
         memory = Memory(limit=1e2,
                         action_shape={'categorical': (arglist.NUM_ACTIONS,),
-                                      'screen1': (arglist.FEAT2DSIZE, arglist.FEAT2DSIZE),
-                                      'screen2': (arglist.FEAT2DSIZE, arglist.FEAT2DSIZE)},
-                        observation_shape={'minimap': (arglist.FEAT2DSIZE, arglist.FEAT2DSIZE),
-                                           'screen': (arglist.FEAT2DSIZE, arglist.FEAT2DSIZE),
+                                      'screen1': (1, arglist.FEAT2DSIZE, arglist.FEAT2DSIZE),
+                                      'screen2': (1, arglist.FEAT2DSIZE, arglist.FEAT2DSIZE)},
+                        observation_shape={'minimap': (7, arglist.FEAT2DSIZE, arglist.FEAT2DSIZE),
+                                           'screen': (17, arglist.FEAT2DSIZE, arglist.FEAT2DSIZE),
                                            'nonspatial': (arglist.NUM_ACTIONS,)})
         learner = DDPGAgent(actor, critic, memory)
         preprocess = Preprocess()

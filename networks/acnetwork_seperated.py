@@ -52,7 +52,7 @@ class ActorNet(torch.nn.Module):
         self.apply(init_weights)  # weight initialization
         self.train()  # train mode
 
-    def forward(self, obs, valid_actions):
+    def forward(self, obs):
         obs_minimap = obs['minimap']
         obs_screen = obs['screen']
         obs_nonspatial = obs['nonspatial']
@@ -65,12 +65,11 @@ class ActorNet(torch.nn.Module):
         state_h = torch.cat([m, s, n], dim=1)
         state_h = self.layer_hidden(state_h)
         pol_categorical = self.layer_action(state_h)
-        pol_categorical = self._mask_unavailable_actions(pol_categorical, valid_actions)
 
         # conv. output
-        pol_screen1 = self.layer_screen1_x(state_h)
-        pol_screen2 = self.layer_screen2_x(state_h)
-        return [pol_categorical, pol_screen1, pol_screen2]
+        pol_screen1 = self.layer_screen1(state_h)
+        pol_screen2 = self.layer_screen2(state_h)
+        return {'categorical': pol_categorical, 'screen1': pol_screen1, 'screen2': pol_screen2}
 
     def _conv_output_shape(self, h_w, kernel_size=1, stride=1, pad=0, dilation=1):
         if type(kernel_size) is not tuple:
@@ -78,18 +77,6 @@ class ActorNet(torch.nn.Module):
         h = floor(((h_w[0] + (2 * pad) - (dilation * (kernel_size[0] - 1)) - 1) / stride) + 1)
         w = floor(((h_w[1] + (2 * pad) - (dilation * (kernel_size[1] - 1)) - 1) / stride) + 1)
         return h, w
-
-    def _mask_unavailable_actions(self, policy, valid_actions):
-        """
-            Args:
-                policy_vb, (1, num_actions)
-                valid_action_vb, (num_actions)
-            Returns:
-                masked_policy_vb, (1, num_actions)
-        """
-        masked_policy_vb = policy * valid_actions
-        masked_policy_vb /= masked_policy_vb.sum(1)
-        return masked_policy_vb
 
 
 class CriticNet(torch.nn.Module):

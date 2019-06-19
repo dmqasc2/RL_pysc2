@@ -116,4 +116,4 @@ class Memory(object):
 
     @property
     def nb_entries(self):
-        return len(self.rewards)
+        return self.rewards.length

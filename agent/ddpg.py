@@ -40,10 +40,13 @@ class DDPGAgent(Agent):
             if type(replays[key]) is dict:
                 for subkey in replays[key]:
                     # process
-                    batch[key][subkey] = torch.tensor(replays[key][subkey], dtype=torch.float32).to(self.device)
+                    x = torch.tensor(replays[key][subkey], dtype=torch.float32)
+                    batch[key][subkey] = x.to(self.device)
             else:
                 # process
-                batch[key] = torch.tensor(replays[key], dtype=torch.float32).to(self.device)
+                x = torch.tensor(replays[key], dtype=torch.float32)
+                x = torch.squeeze(x)
+                batch[key] = x.to(self.device)
 
         return batch['obs0'], batch['actions'], batch['rewards'], batch['obs1'], batch['terminals1']
 
@@ -65,12 +68,16 @@ class DDPGAgent(Agent):
         Samples a random batch from replay memory and performs optimization
         :return:
         """
+        if self.memory.nb_entries < arglist.BatchSize * 10:
+            return 0, 0
+
         s0, a0, r, s1, d = self.process_batch()
         # ---------------------- optimize critic ----------------------
         # Use target actor exploitation policy here for loss evaluation
         logits1 = self.target_actor.forward(s1)
-        a1 = [self.gumbel_softmax_hard(x) for x in logits1]
-
+        a1 = {'categorical': 0, 'screen1': 0, 'screen2': 0}
+        for key, value in logits1.items():
+            a1[key] = self.gumbel_softmax_hard(value)
         q_next = self.target_critic.forward(s1, a1)
         q_next = q_next.detach()
         q_next = torch.squeeze(q_next)
@@ -92,7 +99,9 @@ class DDPGAgent(Agent):
 
         # ---------------------- optimize actor ----------------------
         pred_logits0 = self.actor.forward(s0)
-        pred_a0 = [self.gumbel_softmax_hard(x) for x in pred_logits0]
+        pred_a0 = {'categorical': 0, 'screen1': 0, 'screen2': 0}
+        for key, value in pred_logits0.items():
+            pred_a0[key] = self.gumbel_softmax_hard(value)
 
         # Loss: regularization
         l2_reg = torch.cuda.FloatTensor(1)
@@ -118,7 +127,6 @@ class DDPGAgent(Agent):
         # Update target env
         self.soft_update(self.target_actor, self.actor, arglist.TAU)
         self.soft_update(self.target_critic, self.critic, arglist.TAU)
-
         return loss_actor, loss_critic
 
     def soft_update(self, target, source, tau):
