@@ -47,21 +47,25 @@ class Memory(object):
     '''
     def __init__(self, limit, action_shape, observation_shape):
         self.limit = limit
+        self.action_shape = action_shape
+        self.observation_shape =observation_shape
+
         # observation 0
-        self.observations0_minimap = RingBuffer(limit, shape=observation_shape['minimap'])
-        self.observations0_screen = RingBuffer(limit, shape=observation_shape['screen'])
-        self.observations0_nonspatial = RingBuffer(limit, shape=observation_shape['nonspatial'])
+        self.observations0_minimap = RingBuffer(self.limit, shape=self.observation_shape['minimap'])
+        self.observations0_screen = RingBuffer(self.limit, shape=self.observation_shape['screen'])
+        self.observations0_nonspatial = RingBuffer(self.limit, shape=self.observation_shape['nonspatial'])
         # action
-        self.actions_categorial = RingBuffer(limit, shape=action_shape['categorical'])
-        self.actions_screen1 = RingBuffer(limit, shape=action_shape['screen1'])
-        self.actions_screen2 = RingBuffer(limit, shape=action_shape['screen2'])
+        self.actions_categorial = RingBuffer(self.limit, shape=self.action_shape['categorical'])
+        self.actions_screen1 = RingBuffer(self.limit, shape=self.action_shape['screen1'])
+        self.actions_screen2 = RingBuffer(self.limit, shape=self.action_shape['screen2'])
         # reward & terminal flag
-        self.rewards = RingBuffer(limit, shape=(1,))
-        self.terminals1 = RingBuffer(limit, shape=(1,))
+        self.rewards = RingBuffer(self.limit, shape=(1,))
+        self.terminals1 = RingBuffer(self.limit, shape=(1,))
         # observation 1
-        self.observations1_minimap = RingBuffer(limit, shape=observation_shape['minimap'])
-        self.observations1_screen = RingBuffer(limit, shape=observation_shape['screen'])
-        self.observations1_nonspatial = RingBuffer(limit, shape=observation_shape['nonspatial'])
+        self.observations1_minimap = RingBuffer(self.limit, shape=self.observation_shape['minimap'])
+        self.observations1_screen = RingBuffer(self.limit, shape=self.observation_shape['screen'])
+        self.observations1_nonspatial = RingBuffer(self.limit, shape=self.observation_shape['nonspatial'])
+        super().__init__()
 
     def sample(self, batch_size):
         # Draw such that we always have a proceeding element.
@@ -80,11 +84,11 @@ class Memory(object):
         terminal1_batch = self.terminals1.get_batch(batch_idxs)
 
         result = {
-            'obs0': {'minimap': np.array(obs0_batch['minimap']),
-                     'screen': np.array(obs0_batch['screen']),
+            'obs0': {'minimap': array_min2d(obs0_batch['minimap']),
+                     'screen': array_min2d(obs0_batch['screen']),
                      'nonspatial': array_min2d(obs0_batch['nonspatial'])},
-            'obs1': {'minimap': np.array(obs1_batch['minimap']),
-                     'screen': np.array(obs1_batch['screen']),
+            'obs1': {'minimap': array_min2d(obs1_batch['minimap']),
+                     'screen': array_min2d(obs1_batch['screen']),
                      'nonspatial': array_min2d(obs1_batch['nonspatial'])},
             'rewards': array_min2d(reward_batch),
             'actions': {'categorical': array_min2d(action_batch['categorical']),
@@ -117,3 +121,79 @@ class Memory(object):
     @property
     def nb_entries(self):
         return self.rewards.length
+
+
+class EpisodeMemory(Memory):
+    def __init__(self, limit, action_shape, observation_shape):
+        super().__init__(limit, action_shape, observation_shape)
+
+    def sample(self):
+        # Draw such that we always have a proceeding element.
+        batch_idxs = [x for x in range(self.nb_entries)]
+        obs0_batch = {'minimap': self.observations0_minimap.get_batch(batch_idxs),
+                      'screen': self.observations0_screen.get_batch(batch_idxs),
+                      'nonspatial': self.observations0_nonspatial.get_batch(batch_idxs)}
+        obs1_batch = {'minimap': self.observations1_minimap.get_batch(batch_idxs),
+                      'screen': self.observations1_screen.get_batch(batch_idxs),
+                      'nonspatial': self.observations1_nonspatial.get_batch(batch_idxs)}
+        action_batch = {'categorical': self.actions_categorial.get_batch(batch_idxs),
+                        'screen1': self.actions_screen1.get_batch(batch_idxs),
+                        'screen2': self.actions_screen2.get_batch(batch_idxs)}
+        reward_batch = self.rewards.get_batch(batch_idxs)
+        terminal1_batch = self.terminals1.get_batch(batch_idxs)
+
+        result = {
+            'obs0': {'minimap': array_min2d(obs0_batch['minimap']),
+                     'screen': array_min2d(obs0_batch['screen']),
+                     'nonspatial': array_min2d(obs0_batch['nonspatial'])},
+            'obs1': {'minimap': array_min2d(obs1_batch['minimap']),
+                     'screen': array_min2d(obs1_batch['screen']),
+                     'nonspatial': array_min2d(obs1_batch['nonspatial'])},
+            'rewards': array_min2d(reward_batch),
+            'actions': {'categorical': array_min2d(action_batch['categorical']),
+                        'screen1': array_min2d(action_batch['screen1']),
+                        'screen2': array_min2d(action_batch['screen2'])},
+            'terminals1': array_min2d(terminal1_batch),
+        }
+        return result
+
+
+    def clear(self):
+        # observation 0
+        self.observations0_minimap = RingBuffer(self.limit, shape=self.observation_shape['minimap'])
+        self.observations0_screen = RingBuffer(self.limit, shape=self.observation_shape['screen'])
+        self.observations0_nonspatial = RingBuffer(self.limit, shape=self.observation_shape['nonspatial'])
+        # action
+        self.actions_categorial = RingBuffer(self.limit, shape=self.action_shape['categorical'])
+        self.actions_screen1 = RingBuffer(self.limit, shape=self.action_shape['screen1'])
+        self.actions_screen2 = RingBuffer(self.limit, shape=self.action_shape['screen2'])
+        # reward & terminal flag
+        self.rewards = RingBuffer(self.limit, shape=(1,))
+        self.terminals1 = RingBuffer(self.limit, shape=(1,))
+        # observation 1
+        self.observations1_minimap = RingBuffer(self.limit, shape=self.observation_shape['minimap'])
+        self.observations1_screen = RingBuffer(self.limit, shape=self.observation_shape['screen'])
+        self.observations1_nonspatial = RingBuffer(self.limit, shape=self.observation_shape['nonspatial'])
+
+
+if __name__ == '__main__':
+    mem = Memory(limit=1e2,
+                 action_shape={'categorical': (10,),
+                               'screen1': (1, 32, 32),
+                               'screen2': (1, 32, 32)},
+                 observation_shape={'minimap': (7, 32, 32),
+                                    'screen': (17, 32, 32),
+                                    'nonspatial': (10,)})
+    print(1+1)
+
+    mem2 = EpisodeMemory(limit=1e2,
+                         action_shape={'categorical': (10,),
+                                       'screen1': (1, 32, 32),
+                                       'screen2': (1, 32, 32)},
+                         observation_shape={'minimap': (7, 32, 32),
+                                            'screen': (17, 32, 32),
+                                            'nonspatial': (10,)})
+
+    print(1 + 1)
+    mem2.clear()
+    mem2.nb_entries

@@ -14,4 +14,12 @@ LEARNINGRATE = 0.001
 
 BatchSize = 5
 
+memory_limit = 1e2,
+action_shape = {'categorical': (NUM_ACTIONS,),
+                'screen1': (1, FEAT2DSIZE, FEAT2DSIZE),
+                'screen2': (1, FEAT2DSIZE, FEAT2DSIZE)},
+observation_shape = {'minimap': (7, FEAT2DSIZE, FEAT2DSIZE),
+                     'screen': (17, FEAT2DSIZE, FEAT2DSIZE),
+                     'nonspatial': (NUM_ACTIONS,)}
+
 

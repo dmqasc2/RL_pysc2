@@ -5,8 +5,9 @@ import torch
 from utils import arglist
 from runs.minigame import MiniGame
 from agent.ddpg import DDPGAgent
+from agent.ppo import PPOAgent
 from networks.acnetwork_seperated import ActorNet, CriticNet
-from utils.memory import Memory
+from utils.memory import Memory, EpisodeMemory
 from utils.preprocess import Preprocess
 
 torch.set_default_tensor_type('torch.FloatTensor')
@@ -20,19 +21,26 @@ env_names = ["DefeatZerglingsAndBanelings", "DefeatRoaches",
              "CollectMineralShards", "MoveToBeacon", "FindAndDefeatZerglings",
              "BuildMarines", "CollectMineralsAndGas"]
 
+rl_algo = 'ppo'
+
 
 def main(_):
     for map_name in env_names:
         actor = ActorNet()
         critic = CriticNet()
-        memory = Memory(limit=1e2,
-                        action_shape={'categorical': (arglist.NUM_ACTIONS,),
-                                      'screen1': (1, arglist.FEAT2DSIZE, arglist.FEAT2DSIZE),
-                                      'screen2': (1, arglist.FEAT2DSIZE, arglist.FEAT2DSIZE)},
-                        observation_shape={'minimap': (7, arglist.FEAT2DSIZE, arglist.FEAT2DSIZE),
-                                           'screen': (17, arglist.FEAT2DSIZE, arglist.FEAT2DSIZE),
-                                           'nonspatial': (arglist.NUM_ACTIONS,)})
-        learner = DDPGAgent(actor, critic, memory)
+
+        if rl_algo == 'ddpg':
+            memory = Memory(limit=arglist.memory_limit,
+                            action_shape=arglist.action_shape,
+                            observation_shape=arglist.observation_shape)
+            learner = DDPGAgent(actor, critic, memory)
+
+        elif rl_algo == 'ppo':
+            memory = EpisodeMemory(limit=arglist.memory_limit,
+                                   action_shape=arglist.action_shape,
+                                   observation_shape=arglist.observation_shape)
+            learner = PPOAgent(actor, critic, memory)
+
         preprocess = Preprocess()
         game = MiniGame(map_name, learner, preprocess, nb_episodes=10000)
         game.run()
