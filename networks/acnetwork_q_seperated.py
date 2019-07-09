@@ -71,7 +71,8 @@ class ActorNet(torch.nn.Module):
         pol_screen2 = self.layer_screen2(state_h)
         return {'categorical': pol_categorical, 'screen1': pol_screen1, 'screen2': pol_screen2}
 
-    def _conv_output_shape(self, h_w, kernel_size=1, stride=1, pad=0, dilation=1):
+    @staticmethod
+    def _conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
         if type(kernel_size) is not tuple:
             kernel_size = (kernel_size, kernel_size)
         h = floor(((h_w[0] + (2 * pad) - (dilation * (kernel_size[0] - 1)) - 1) / stride) + 1)
@@ -139,7 +140,8 @@ class CriticNet(torch.nn.Module):
         q = self.layer_value(sa)
         return q
 
-    def _conv_output_shape(self, h_w, kernel_size=1, stride=1, pad=0, dilation=1):
+    @staticmethod
+    def _conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
         if type(kernel_size) is not tuple:
             kernel_size = (kernel_size, kernel_size)
         h = floor(((h_w[0] + (2 * pad) - (dilation * (kernel_size[0] - 1)) - 1) / stride) + 1)

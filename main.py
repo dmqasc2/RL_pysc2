@@ -4,10 +4,6 @@ import sys
 import torch
 from utils import arglist
 from runs.minigame import MiniGame
-from agent.ddpg import DDPGAgent
-from agent.ppo import PPOAgent
-from networks.acnetwork_seperated import ActorNet, CriticNet
-from utils.memory import Memory, EpisodeMemory
 from utils.preprocess import Preprocess
 
 torch.set_default_tensor_type('torch.FloatTensor')
@@ -26,20 +22,32 @@ rl_algo = 'ppo'
 
 def main(_):
     for map_name in env_names:
-        actor = ActorNet()
-        critic = CriticNet()
-
         if rl_algo == 'ddpg':
+            from agent.ddpg import DDPGAgent
+            from networks.acnetwork_q_seperated import ActorNet, CriticNet
+            from utils.memory import Memory
+
+            actor = ActorNet()
+            critic = CriticNet()
             memory = Memory(limit=arglist.memory_limit,
                             action_shape=arglist.action_shape,
                             observation_shape=arglist.observation_shape)
             learner = DDPGAgent(actor, critic, memory)
 
         elif rl_algo == 'ppo':
+            from agent.ppo import PPOAgent
+            from networks.acnetwork_v_seperated import ActorNet, CriticNet
+            from utils.memory import EpisodeMemory
+
+            actor = ActorNet()
+            critic = CriticNet()
             memory = EpisodeMemory(limit=arglist.memory_limit,
                                    action_shape=arglist.action_shape,
                                    observation_shape=arglist.observation_shape)
             learner = PPOAgent(actor, critic, memory)
+
+        else:
+            raise NotImplementedError()
 
         preprocess = Preprocess()
         game = MiniGame(map_name, learner, preprocess, nb_episodes=10000)

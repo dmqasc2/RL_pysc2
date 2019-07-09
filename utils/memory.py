@@ -157,7 +157,6 @@ class EpisodeMemory(Memory):
         }
         return result
 
-
     def clear(self):
         # observation 0
         self.observations0_minimap = RingBuffer(self.limit, shape=self.observation_shape['minimap'])
