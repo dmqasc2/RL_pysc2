@@ -35,11 +35,13 @@ class MiniGame:
                 actions = self.preprocess.postprocess_action(actions)
                 self.learner.memory.append(obs0=obs, action=actions, reward=state.reward,
                                            obs1=obs_new, terminal1=state.last(), training=is_training)
-                self.learner.optimize()
+                # self.learner.optimize() # ddpg
+
                 if state.last():
                     cum_reward = state.observation["score_cumulative"]
                     reward_cumulative.append(cum_reward[0])
                     break
+            self.learner.optimize(update=True)  # ddpg
 
 
         self.env.close()

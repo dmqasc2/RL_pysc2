@@ -92,21 +92,9 @@ class CriticNet(torch.nn.Module):
         # non-spatial features
         self.nonspatial_dense = dense_nonspatial
 
-        # process action
-        # spatial action
-        self.conv_action = nn.Sequential(nn.Conv2d(2, 16, 5, stride=1, padding=2),  # shape (N, 16, m, m)
-                                         nn.ReLU(),
-                                         nn.Conv2d(16, 32, 3, stride=1, padding=1),  # shape (N, 32, m, m)
-                                         nn.ReLU())
-
-        # non-spatial action
-        self.action_dense = nn.Sequential(nn.Linear(arglist.NUM_ACTIONS, 32),
-                                          nn.ReLU(),
-                                          Dense2Conv())
-
         # state representations
-        # screen + minimap + nonspatial_obs + spatial_act + nonspatial_act
-        self.layer_hidden = nn.Sequential(nn.Conv2d(32 * 5, 64, 3, stride=1, padding=1),
+        # screen + minimap + nonspatial_obs
+        self.layer_hidden = nn.Sequential(nn.Conv2d(32 * 3, 64, 3, stride=1, padding=1),
                                           nn.ReLU(),
                                           nn.Conv2d(64, 1, 1),
                                           nn.ReLU(),
@@ -116,29 +104,21 @@ class CriticNet(torch.nn.Module):
         self.apply(init_weights)  # weight initialization
         self.train()  # train mode
 
-    def forward(self, obs, actions):
+    def forward(self, obs):
         obs_minimap = obs['minimap']
         obs_screen = obs['screen']
         obs_nonspatial = obs['nonspatial']
-
-        act_categorical = actions['categorical']
-        act_screen1 = actions['screen1']
-        act_screen2 = actions['screen2']
 
         # process observations
         m = self.minimap_conv_layers(obs_minimap)
         s = self.screen_conv_layers(obs_screen)
         n = self.nonspatial_dense(obs_nonspatial)
 
-        # process actions
-        a_spatial = self.conv_action(torch.cat([act_screen1, act_screen2], dim=1))
-        a_nonspatial = self.action_dense(act_categorical)
-
         # combine action & observation
-        sa = torch.cat([m, s, n, a_spatial, a_nonspatial], dim=1)
-        sa = self.layer_hidden(sa)
-        q = self.layer_value(sa)
-        return q
+        sh = torch.cat([m, s, n], dim=1)
+        sh = self.layer_hidden(sh)
+        v = self.layer_value(sh)
+        return v
 
     @staticmethod
     def _conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):

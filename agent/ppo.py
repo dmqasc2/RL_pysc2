@@ -17,10 +17,10 @@ class PPOAgent(Agent):
 
         self.iter = 0
         self.actor = actor.to(self.device)
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), arglist.LEARNINGRATE)
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), arglist.PPO.actor_lr)
 
         self.critic = critic.to(self.device)
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), arglist.LEARNINGRATE)
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), arglist.PPO.critic_lr)
 
         self.memory = memory
 
@@ -29,7 +29,7 @@ class PPOAgent(Agent):
         Transforms numpy replays to torch tensor
         :return: dict of torch.tensor
         """
-        replays = self.memory.sample(arglist.BatchSize)
+        replays = self.memory.sample()
         batch = {}
         for key in replays:
             batch[key] = {}
@@ -44,7 +44,21 @@ class PPOAgent(Agent):
                 x = torch.squeeze(x)
                 batch[key] = x.to(self.device)
 
+        self.flatten_actions(batch['actions'])
+
         return batch['obs0'], batch['actions'], batch['rewards'], batch['obs1'], batch['terminals1']
+
+    @staticmethod
+    def flatten_actions(x):
+        '''
+        process 2D actions to 1D actions (reshape actions)
+        :input x: dict.
+        :return: dict.
+        '''
+        for k, v in x.items():
+            if len(v.shape) == 4:
+                x[k] = v.reshape(v.shape[0], -1)
+        return x
 
     @staticmethod
     def gumbel_softmax(x, hard=True):
@@ -75,12 +89,12 @@ class PPOAgent(Agent):
         running_advantages = 0
 
         for t in reversed(range(0, len(rewards))):
-            running_returns = rewards[t] + arglist.PPOHyperParams.gamma * \
+            running_returns = rewards[t] + arglist.PPO.gamma * \
                               running_returns * masks[t]
-            running_tderror = rewards[t] + arglist.PPOHyperParams.gamma * \
+            running_tderror = rewards[t] + arglist.PPO.gamma * \
                               previous_value * masks[t] - values.data[t]
-            running_advantages = running_tderror + arglist.PPOHyperParams.gamma * \
-                                 arglist.PPOHyperParams.lamda * running_advantages * masks[t]
+            running_advantages = running_tderror + arglist.PPO.gamma * \
+                                 arglist.PPO.lamda * running_advantages * masks[t]
 
             returns[t] = running_returns
             previous_value = values.data[t]
@@ -101,6 +115,8 @@ class PPOAgent(Agent):
             reference: https://github.com/takuseno/ppo/blob/master/build_graph.py
         '''
         logits = self.actor(obs)
+        logits = self.flatten_actions(logits)
+
         surrogate = {'categorical': 0, 'screen1': 0, 'screen2': 0}
         ratio = {'categorical': 0, 'screen1': 0, 'screen2': 0}
         for key, value in actions.items():
@@ -108,13 +124,12 @@ class PPOAgent(Agent):
             probs = self.gumbel_softmax(logits[key], hard=False)
             # make distribution
             m = Categorical(probs)
-            
             # calc. ratio
-            new_policy = m.log_prob(actions[key])
-            old_policy = old_policy[key][index]
-            r = torch.exp(new_policy - old_policy)
+            new_policy = m.log_prob(actions[key].argmax(dim=-1))
+            old_pol = old_policy[key][index]
+            r = torch.exp(new_policy - old_pol)
             s = r * advantages
-            
+
             ratio[key] = r
             surrogate[key] = s
 
@@ -128,24 +143,27 @@ class PPOAgent(Agent):
         if not update:
             return 0, 0
 
+        # PPO update
         self.actor.train()
         self.critic.train()
 
         s0, a0, r, _, d = self.process_batch()
-        values = self.critic(s0)
+        values = self.critic(s0).reshape(-1)
 
         # ----------------------------
         # step 1: get returns and GAEs and log probability of old policy
         returns, advantages = self.get_gae(r, d, values)
 
         logits = self.actor(s0)
+        logits = self.flatten_actions(logits)
+
         old_policy = {'categorical': 0, 'screen1': 0, 'screen2': 0}
         for k, v in logits.items():
             # get probability from logits using Gumbel softmax (for exploration)
             probs = self.gumbel_softmax(v, hard=False)
             # make distribution
             m = Categorical(probs)
-            old_policy[k] = m.log_prob(a0[k]).detach()
+            old_policy[k] = m.log_prob(a0[k].argmax(dim=-1)).detach()
 
         criterion = torch.nn.MSELoss()
         n = len(r)
@@ -156,19 +174,25 @@ class PPOAgent(Agent):
         for epoch in range(10):
             np.random.shuffle(arr)
 
-            for i in range(n // arglist.BatchSize):
-                batch_index = arr[arglist.BatchSize * i: arglist.BatchSize * (i + 1)]
-                batch_index = torch.LongTensor(batch_index)
-                inputs = s0[batch_index]
-                returns_samples = returns.unsqueeze(1)[batch_index]
-                advantages_samples = advantages.unsqueeze(1)[batch_index]
-                actions_samples = a0[batch_index]
+            for i in range(n // arglist.PPO.BatchSize):
+                batch_index = arr[arglist.PPO.BatchSize * i: arglist.PPO.BatchSize * (i + 1)]
+                # observation batch slicing
+                inputs = {'minimap': 0, 'screen': 0, 'nonspatial': 0}
+                for k in inputs.keys():
+                    inputs[k] = s0[k][batch_index]
+                returns_samples = returns[batch_index]
+                advantages_samples = advantages[batch_index]
+
+                # action batch slicing
+                actions_samples = {'categorical': 0, 'screen1': 0, 'screen2': 0}
+                for k in actions_samples.keys():
+                    actions_samples[k] = a0[k][batch_index]
 
                 loss, ratio = self.surrogate_loss(advantages_samples, inputs,
                                                   old_policy, actions_samples,
                                                   batch_index)
 
-                values = self.critic(inputs)
+                values = self.critic(inputs).reshape(-1)
                 loss_critic = criterion(values, returns_samples)
                 self.critic_optimizer.zero_grad()
                 loss_critic.backward()
@@ -176,17 +200,18 @@ class PPOAgent(Agent):
 
                 torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 0.5)
 
-                clipped_ratio = torch.clamp(ratio,
-                                            1.0 - arglist.PPOHyperParams.clip_param,
-                                            1.0 + arglist.PPOHyperParams.clip_param)
-                clipped_loss = clipped_ratio * advantages_samples
-                loss_actor = -torch.min(loss, clipped_loss).mean()
-
                 self.actor_optimizer.zero_grad()
+                loss_actor = 0
+                for k in loss.keys():
+                    clipped_ratio = torch.clamp(ratio[k],
+                                                1.0 - arglist.PPO.clip_param,
+                                                1.0 + arglist.PPO.clip_param)
+                    clipped_loss = clipped_ratio * advantages_samples
+                    loss_actor += -torch.min(loss[k], clipped_loss).mean()
                 loss_actor.backward()
                 self.actor_optimizer.step()
 
-        return loss_actor, loss_critic
+        return loss_actor, loss_critic.item()
 
     def soft_update(self, target, source, tau):
         """
@@ -217,8 +242,8 @@ class PPOAgent(Agent):
         :param episode_count: the count of episodes iterated
         :return:
         """
-        torch.save(self.target_actor.state_dict(), str(fname) + '_actor.pt')
-        torch.save(self.target_critic.state_dict(), str(fname) + '_critic.pt')
+        torch.save(self.actor.state_dict(), str(fname) + '_actor.pt')
+        torch.save(self.critic.state_dict(), str(fname) + '_critic.pt')
         print('Models saved successfully')
 
     def load_models(self, fname):
@@ -229,8 +254,6 @@ class PPOAgent(Agent):
         """
         self.actor.load_state_dict(torch.load(str(fname) + '_actor.pt'))
         self.critic.load_state_dict(torch.load(str(fname) + '_critic.pt'))
-        self.hard_update(self.target_actor, self.actor)
-        self.hard_update(self.target_critic, self.critic)
         print('Models loaded succesfully')
 
     def save_training_checkpoint(self, state, is_best, episode_count):

@@ -17,11 +17,11 @@ class DDPGAgent(Agent):
         self.iter = 0
         self.actor = actor.to(self.device)
         self.target_actor = copy.deepcopy(actor).to(self.device)
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), arglist.LEARNINGRATE)
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), arglist.DDPG.LEARNINGRATE)
 
         self.critic = critic.to(self.device)
         self.target_critic = copy.deepcopy(critic).to(self.device)
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), arglist.LEARNINGRATE)
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), arglist.DDPG.LEARNINGRATE)
 
         self.memory = memory
 
@@ -33,7 +33,7 @@ class DDPGAgent(Agent):
         Transforms numpy replays to torch tensor
         :return: dict of torch.tensor
         """
-        replays = self.memory.sample(arglist.BatchSize)
+        replays = self.memory.sample(arglist.DDPG.BatchSize)
         batch = {}
         for key in replays:
             batch[key] = {}
@@ -68,7 +68,7 @@ class DDPGAgent(Agent):
         Samples a random batch from replay memory and performs optimization
         :return:
         """
-        if self.memory.nb_entries < arglist.BatchSize * 10:
+        if self.memory.nb_entries < arglist.DDPG.BatchSize * 10:
             return 0, 0
 
         s0, a0, r, s1, d = self.process_batch()
@@ -83,7 +83,7 @@ class DDPGAgent(Agent):
         q_next = torch.squeeze(q_next)
         # Loss: TD error
         # y_exp = r + gamma*Q'( s1, pi'(s1))
-        y_expected = r + arglist.GAMMA * q_next * (1. - d)
+        y_expected = r + arglist.DDPG.GAMMA * q_next * (1. - d)
         # y_pred = Q( s0, a0)
         y_predicted = self.critic.forward(s0, a0)
         y_predicted = torch.squeeze(y_predicted)
@@ -125,8 +125,8 @@ class DDPGAgent(Agent):
         self.actor_optimizer.step()
 
         # Update target env
-        self.soft_update(self.target_actor, self.actor, arglist.TAU)
-        self.soft_update(self.target_critic, self.critic, arglist.TAU)
+        self.soft_update(self.target_actor, self.actor, arglist.DDPG.TAU)
+        self.soft_update(self.target_critic, self.critic, arglist.DDPG.TAU)
         return loss_actor, loss_critic
 
     def soft_update(self, target, source, tau):

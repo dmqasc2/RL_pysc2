@@ -41,7 +41,7 @@ def main(_):
 
             actor = ActorNet()
             critic = CriticNet()
-            memory = EpisodeMemory(limit=arglist.memory_limit,
+            memory = EpisodeMemory(limit=arglist.PPO.memory_limit,
                                    action_shape=arglist.action_shape,
                                    observation_shape=arglist.observation_shape)
             learner = PPOAgent(actor, critic, memory)

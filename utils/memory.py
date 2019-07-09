@@ -46,9 +46,9 @@ class Memory(object):
     obs1 = {'minimap': [], 'screen': [], 'nonspatial': []}
     '''
     def __init__(self, limit, action_shape, observation_shape):
-        self.limit = limit
+        self.limit = int(limit)
         self.action_shape = action_shape
-        self.observation_shape =observation_shape
+        self.observation_shape = observation_shape
 
         # observation 0
         self.observations0_minimap = RingBuffer(self.limit, shape=self.observation_shape['minimap'])
@@ -129,7 +129,7 @@ class EpisodeMemory(Memory):
 
     def sample(self):
         # Draw such that we always have a proceeding element.
-        batch_idxs = [x for x in range(self.nb_entries)]
+        batch_idxs = np.array([x for x in range(self.nb_entries)])
         obs0_batch = {'minimap': self.observations0_minimap.get_batch(batch_idxs),
                       'screen': self.observations0_screen.get_batch(batch_idxs),
                       'nonspatial': self.observations0_nonspatial.get_batch(batch_idxs)}
