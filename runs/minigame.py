@@ -1,6 +1,6 @@
 from pysc2.env import sc2_env
-from pysc2.lib import actions
 from utils import arglist
+from copy import deepcopy
 
 
 agent_format = sc2_env.AgentInterfaceFormat(
@@ -22,27 +22,82 @@ class MiniGame:
         self.learner = learner
         self.preprocess = preprocess
 
-    def run(self, is_training=True):
+    def run_ddpg(self, is_training=True):
         reward_cumulative = []
         for i_episode in range(self.nb_episodes):
             state = self.env.reset()[0]
             for t in range(self.nb_max_steps):  # Don't infinite loop while learning
                 obs = self.preprocess.get_observation(state)
                 actions = self.learner.select_action(obs, valid_actions=obs['nonspatial'])
-                state = self.env.step(actions=[actions])[0]
-                obs_new = self.preprocess.get_observation(state)
-                # memory
+                state_new = self.env.step(actions=[actions])[0]
+
+                # append memory
                 actions = self.preprocess.postprocess_action(actions)
-                self.learner.memory.append(obs0=obs, action=actions, reward=state.reward,
-                                           obs1=obs_new, terminal1=state.last(), training=is_training)
-                # self.learner.optimize() # ddpg
+                self.learner.memory.append(obs, actions, state.reward, state.last(), training=is_training)
+                self.learner.optimize()
 
                 if state.last():
                     cum_reward = state.observation["score_cumulative"]
                     reward_cumulative.append(cum_reward[0])
                     break
-            self.learner.optimize(update=True)  # ddpg
-
-
+                state = deepcopy(state_new)
         self.env.close()
         print(reward_cumulative)
+
+    def run_ppo(self, is_training=True):
+        reward_cumulative = []
+        for i_episode in range(self.nb_episodes):
+            state = self.env.reset()[0]
+            for t in range(self.nb_max_steps):  # Don't infinite loop while learning
+                obs = self.preprocess.get_observation(state)
+                actions = self.learner.select_action(obs, valid_actions=obs['nonspatial'])
+                state_new = self.env.step(actions=[actions])[0]
+
+                # append memory
+                actions = self.preprocess.postprocess_action(actions)
+                self.learner.memory.append(obs, actions, state.reward, state.last(), training=is_training)
+
+                if state.last():
+                    cum_reward = state.observation["score_cumulative"]
+                    reward_cumulative.append(cum_reward[0])
+                    break
+                state = deepcopy(state_new)
+            self.learner.optimize(update=True)
+        self.env.close()
+        print(reward_cumulative)
+
+
+if __name__ == '__main__':
+    from absl import app
+    from absl import flags
+    import sys
+    import torch
+    from utils import arglist
+    from utils.preprocess import Preprocess
+
+    torch.set_default_tensor_type('torch.FloatTensor')
+    torch.manual_seed(arglist.SEED)
+
+    FLAGS = flags.FLAGS
+    FLAGS(sys.argv)
+    flags.DEFINE_bool("render", False, "Whether to render with pygame.")
+
+
+    def main(_):
+        map_name = "DefeatZerglingsAndBanelings"
+
+        from agent.ddpg import DDPGAgent
+        from networks.acnetwork_q_seperated import ActorNet, CriticNet
+        from utils.memory import SequentialMemory
+
+        actor = ActorNet()
+        critic = CriticNet()
+        memory = SequentialMemory(limit=arglist.DDPG.memory_limit)
+        learner = DDPGAgent(actor, critic, memory)
+        preprocess = Preprocess()
+        game = MiniGame(map_name, learner, preprocess, nb_episodes=10000)
+        game.run_ddpg()
+        return 0
+
+
+    app.run(main)

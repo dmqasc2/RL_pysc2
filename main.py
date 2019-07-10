@@ -25,13 +25,11 @@ def main(_):
         if rl_algo == 'ddpg':
             from agent.ddpg import DDPGAgent
             from networks.acnetwork_q_seperated import ActorNet, CriticNet
-            from utils.memory import Memory
+            from utils.memory import SequentialMemory
 
             actor = ActorNet()
             critic = CriticNet()
-            memory = Memory(limit=arglist.memory_limit,
-                            action_shape=arglist.action_shape,
-                            observation_shape=arglist.observation_shape)
+            memory = SequentialMemory(limit=arglist.memory_limit)
             learner = DDPGAgent(actor, critic, memory)
 
         elif rl_algo == 'ppo':
