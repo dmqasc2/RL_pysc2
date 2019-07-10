@@ -29,24 +29,39 @@ class PPOAgent(Agent):
         Transforms numpy replays to torch tensor
         :return: dict of torch.tensor
         """
-        replays = self.memory.sample()
-        batch = {}
-        for key in replays:
-            batch[key] = {}
-            if type(replays[key]) is dict:
-                for subkey in replays[key]:
-                    # process
-                    x = torch.tensor(replays[key][subkey], dtype=torch.float32)
+        replays = self.memory.sample(arglist.DDPG.BatchSize)
+        replays = x
+        # initialize batch experience
+        batch = {'state': {'minimap': [], 'screen': [], 'nonspatial': []},
+                 'action': {'categorical': [], 'screen1': [], 'screen2': []},
+                 'reward': [],
+                 'terminal': [],
+                 }
+        # append experience to list
+        for e in replays:
+            # state0
+            for k, v in e.state.items():
+                batch['state'][k].append(v)
+            # action
+            for k, v in e.action.items():
+                batch['action'][k].append(v)
+            # reward
+            batch['reward'].append(e.reward)
+            # terminal1
+            batch['terminal'].append(0. if e.terminal else 1.)
+
+        # make torch tensor
+        for key in batch.keys():
+            if type(batch[key]) is dict:
+                for subkey in batch[key]:
+                    x = torch.tensor(batch[key][subkey], dtype=torch.float32)
                     batch[key][subkey] = x.to(self.device)
             else:
-                # process
-                x = torch.tensor(replays[key], dtype=torch.float32)
+                x = torch.tensor(batch[key], dtype=torch.float32)
                 x = torch.squeeze(x)
                 batch[key] = x.to(self.device)
 
-        self.flatten_actions(batch['actions'])
-
-        return batch['obs0'], batch['actions'], batch['rewards'], batch['obs1'], batch['terminals1']
+        return batch['state'], batch['action'], batch['reward'], batch['terminal']
 
     @staticmethod
     def flatten_actions(x):
@@ -147,14 +162,14 @@ class PPOAgent(Agent):
         self.actor.train()
         self.critic.train()
 
-        s0, a0, r, _, d = self.process_batch()
-        values = self.critic(s0).reshape(-1)
+        s, a, r, d = self.process_batch()
+        values = self.critic(s).reshape(-1)
 
         # ----------------------------
         # step 1: get returns and GAEs and log probability of old policy
         returns, advantages = self.get_gae(r, d, values)
 
-        logits = self.actor(s0)
+        logits = self.actor(s)
         logits = self.flatten_actions(logits)
 
         old_policy = {'categorical': 0, 'screen1': 0, 'screen2': 0}
@@ -163,7 +178,7 @@ class PPOAgent(Agent):
             probs = self.gumbel_softmax(v, hard=False)
             # make distribution
             m = Categorical(probs)
-            old_policy[k] = m.log_prob(a0[k].argmax(dim=-1)).detach()
+            old_policy[k] = m.log_prob(a[k].argmax(dim=-1)).detach()
 
         criterion = torch.nn.MSELoss()
         n = len(r)
@@ -179,14 +194,14 @@ class PPOAgent(Agent):
                 # observation batch slicing
                 inputs = {'minimap': 0, 'screen': 0, 'nonspatial': 0}
                 for k in inputs.keys():
-                    inputs[k] = s0[k][batch_index]
+                    inputs[k] = s[k][batch_index]
                 returns_samples = returns[batch_index]
                 advantages_samples = advantages[batch_index]
 
                 # action batch slicing
                 actions_samples = {'categorical': 0, 'screen1': 0, 'screen2': 0}
                 for k in actions_samples.keys():
-                    actions_samples[k] = a0[k][batch_index]
+                    actions_samples[k] = a[k][batch_index]
 
                 loss, ratio = self.surrogate_loss(advantages_samples, inputs,
                                                   old_policy, actions_samples,

@@ -8,7 +8,7 @@ import numpy as np
 # This is to be understood as a transition: Given `state0`, performing `action`
 # yields `reward` and results in `state1`, which might be `terminal`.
 Experience = namedtuple('Experience', 'state0, action, reward, state1, terminal1')
-
+Trajectory = namedtuple('Trajectory', 'state, action, reward, terminal')
 EpisodicTimestep = namedtuple('EpisodicTimestep', 'observation, action, reward, terminal')
 
 
@@ -297,6 +297,68 @@ class EpisodicMemory(Memory):
         return True
 
 
+class SingleEpisodeMemory(Memory):
+    def __init__(self, limit, **kwargs):
+        super(SingleEpisodeMemory, self).__init__(**kwargs)
+
+        self.limit = limit
+
+        # Do not use deque to implement the memory. This data structure may seem convenient but
+        # it is way too slow on random access. Instead, we use our own ring buffer implementation.
+        self.actions = RingBuffer(limit)
+        self.rewards = RingBuffer(limit)
+        self.terminals = RingBuffer(limit)
+        self.observations = RingBuffer(limit)
+
+    def clear(self):
+        self.actions = RingBuffer(self.limit)
+        self.rewards = RingBuffer(self.limit)
+        self.terminals = RingBuffer(self.limit)
+        self.observations = RingBuffer(self.limit)
+
+    def sample(self):
+        # Get indexes such that we have at least a single entry before each
+        # index.
+        batch_idxs = np.arange(self.nb_entries)
+        # batch_idxs = np.array(batch_idxs) + 1
+
+        # Create experiences
+        experiences = []
+        for idx in batch_idxs:
+            state = self.observations[idx]
+            action = self.actions[idx]
+            reward = self.rewards[idx]
+            terminal = self.terminals[idx]
+            experiences.append(Trajectory(state=state, action=action, reward=reward,
+                                          terminal=terminal))
+
+        return experiences
+
+    def append(self, observation, action, reward, terminal, training=True):
+        super(SingleEpisodeMemory, self).append(observation, action, reward, terminal, training=training)
+
+        # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
+        # and weather the next state is `terminal` or not.
+        if training:
+            self.observations.append(observation)
+            self.actions.append(action)
+            self.rewards.append(reward)
+            self.terminals.append(terminal)
+
+    @property
+    def nb_entries(self):
+        return len(self.observations)
+
+    def get_config(self):
+        config = super(SingleEpisodeMemory, self).get_config()
+        config['limit'] = self.limit
+        return config
+
+    @property
+    def is_episodic(self):
+        return False
+
+
 if __name__ == '__main__':
     action_shape = {'categorical': (10,),
                     'screen1': (1, 32, 32),
@@ -305,7 +367,7 @@ if __name__ == '__main__':
                          'screen': (17, 32, 32),
                          'nonspatial': (10,)}
 
-    # test sequential memory
+    # test SequentialMemory
     mem = SequentialMemory(limit=10, window_length=1)
 
     ## insert
@@ -322,5 +384,24 @@ if __name__ == '__main__':
 
     ## sample
     x = mem.sample(batch_size=3)
+
+
+    # test SingleEpisodeMemory
+    mem = SingleEpisodeMemory(limit=10, window_length=1)
+
+    ## insert
+    for r in range(10):
+        obs = {}
+        for k, v in observation_shape.items():
+            obs[k] = np.random.uniform(size=v)
+
+        action = {}
+        for k, v in action_shape.items():
+            action[k] = np.random.uniform(size=v)
+
+        mem.append(obs, action, r, terminal=False, training=True)
+
+    ## sample
+    x = mem.sample()
 
 

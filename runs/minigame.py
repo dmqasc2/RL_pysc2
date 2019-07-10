@@ -40,7 +40,8 @@ class MiniGame:
                     cum_reward = state.observation["score_cumulative"]
                     reward_cumulative.append(cum_reward[0])
                     break
-                state = deepcopy(state_new)
+                else:
+                    state = deepcopy(state_new)
         self.env.close()
         print(reward_cumulative)
 
@@ -60,9 +61,10 @@ class MiniGame:
                 if state.last():
                     cum_reward = state.observation["score_cumulative"]
                     reward_cumulative.append(cum_reward[0])
+                    self.learner.optimize(update=True)
                     break
-                state = deepcopy(state_new)
-            self.learner.optimize(update=True)
+                else:
+                    state = deepcopy(state_new)
         self.env.close()
         print(reward_cumulative)
 

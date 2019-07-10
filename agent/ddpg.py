@@ -34,21 +34,42 @@ class DDPGAgent(Agent):
         :return: dict of torch.tensor
         """
         replays = self.memory.sample(arglist.DDPG.BatchSize)
-        batch = {}
-        for key in replays:
-            batch[key] = {}
-            if type(replays[key]) is dict:
-                for subkey in replays[key]:
-                    # process
-                    x = torch.tensor(replays[key][subkey], dtype=torch.float32)
+
+        # initialize batch experience
+        batch = {'state0': {'minimap': [], 'screen': [], 'nonspatial': []},
+                 'action': {'categorical': [], 'screen1': [], 'screen2': []},
+                 'reward': [],
+                 'state1': {'minimap': [], 'screen': [], 'nonspatial': []},
+                 'terminal1': [],
+                 }
+        # append experience to list
+        for e in replays:
+            # state0
+            for k, v in e.state0[0].items():
+                batch['state0'][k].append(v)
+            # action
+            for k, v in e.action.items():
+                batch['action'][k].append(v)
+            # reward
+            batch['reward'].append(e.reward)
+            # state1
+            for k, v in e.state1[0].items():
+                batch['state1'][k].append(v)
+            # terminal1
+            batch['terminal1'].append(0. if e.terminal1 else 1.)
+
+        # make torch tensor
+        for key in batch.keys():
+            if type(batch[key]) is dict:
+                for subkey in batch[key]:
+                    x = torch.tensor(batch[key][subkey], dtype=torch.float32)
                     batch[key][subkey] = x.to(self.device)
             else:
-                # process
-                x = torch.tensor(replays[key], dtype=torch.float32)
+                x = torch.tensor(batch[key], dtype=torch.float32)
                 x = torch.squeeze(x)
                 batch[key] = x.to(self.device)
 
-        return batch['obs0'], batch['actions'], batch['rewards'], batch['obs1'], batch['terminals1']
+        return batch['state0'], batch['action'], batch['reward'], batch['state1'], batch['terminal1']
 
     def gumbel_softmax_hard(self, x):
         shape = x.shape
