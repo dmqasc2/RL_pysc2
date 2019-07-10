@@ -17,7 +17,7 @@ env_names = ["DefeatZerglingsAndBanelings", "DefeatRoaches",
              "CollectMineralShards", "MoveToBeacon", "FindAndDefeatZerglings",
              "BuildMarines", "CollectMineralsAndGas"]
 
-rl_algo = 'ppo'
+rl_algo = 'ddpg'
 
 
 def main(_):
@@ -29,7 +29,7 @@ def main(_):
 
             actor = ActorNet()
             critic = CriticNet()
-            memory = SequentialMemory(limit=arglist.memory_limit)
+            memory = SequentialMemory(limit=arglist.DDPG.memory_limit)
             learner = DDPGAgent(actor, critic, memory)
 
         elif rl_algo == 'ppo':
@@ -49,7 +49,7 @@ def main(_):
 
         preprocess = Preprocess()
         game = MiniGame(map_name, learner, preprocess, nb_episodes=10000)
-        game.run()
+        game.run_ddpg()
     return 0
 
 

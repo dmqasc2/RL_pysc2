@@ -34,7 +34,7 @@ class MiniGame:
                 # append memory
                 actions = self.preprocess.postprocess_action(actions)
                 self.learner.memory.append(obs, actions, state.reward, state.last(), training=is_training)
-                self.learner.optimize()
+                # self.learner.optimize()
 
                 if state.last():
                     cum_reward = state.observation["score_cumulative"]
@@ -66,38 +66,3 @@ class MiniGame:
         self.env.close()
         print(reward_cumulative)
 
-
-if __name__ == '__main__':
-    from absl import app
-    from absl import flags
-    import sys
-    import torch
-    from utils import arglist
-    from utils.preprocess import Preprocess
-
-    torch.set_default_tensor_type('torch.FloatTensor')
-    torch.manual_seed(arglist.SEED)
-
-    FLAGS = flags.FLAGS
-    FLAGS(sys.argv)
-    flags.DEFINE_bool("render", False, "Whether to render with pygame.")
-
-
-    def main(_):
-        map_name = "DefeatZerglingsAndBanelings"
-
-        from agent.ddpg import DDPGAgent
-        from networks.acnetwork_q_seperated import ActorNet, CriticNet
-        from utils.memory import SequentialMemory
-
-        actor = ActorNet()
-        critic = CriticNet()
-        memory = SequentialMemory(limit=arglist.DDPG.memory_limit)
-        learner = DDPGAgent(actor, critic, memory)
-        preprocess = Preprocess()
-        game = MiniGame(map_name, learner, preprocess, nb_episodes=10000)
-        game.run_ddpg()
-        return 0
-
-
-    app.run(main)
