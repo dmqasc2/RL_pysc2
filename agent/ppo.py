@@ -29,8 +29,7 @@ class PPOAgent(Agent):
         Transforms numpy replays to torch tensor
         :return: dict of torch.tensor
         """
-        replays = self.memory.sample(arglist.DDPG.BatchSize)
-        replays = x
+        replays = self.memory.sample()
         # initialize batch experience
         batch = {'state': {'minimap': [], 'screen': [], 'nonspatial': []},
                  'action': {'categorical': [], 'screen1': [], 'screen2': []},
@@ -65,11 +64,11 @@ class PPOAgent(Agent):
 
     @staticmethod
     def flatten_actions(x):
-        '''
+        """
         process 2D actions to 1D actions (reshape actions)
         :input x: dict.
         :return: dict.
-        '''
+        """
         for k, v in x.items():
             if len(v.shape) == 4:
                 x[k] = v.reshape(v.shape[0], -1)
@@ -91,11 +90,11 @@ class PPOAgent(Agent):
 
     @staticmethod
     def get_gae(rewards, masks, values):
-        '''
+        """
         rewards: immediate rewards
         masks: terminals
         values: value function from critic network
-        '''
+        """
         returns = torch.zeros_like(rewards)
         advantages = torch.zeros_like(rewards)
 
@@ -119,7 +118,7 @@ class PPOAgent(Agent):
         return returns, advantages
 
     def surrogate_loss(self, advantages, obs, old_policy, actions, index):
-        '''
+        """
         <arguments>
             index: batch index
         <original: contituous action space using tensorflow>
@@ -128,7 +127,7 @@ class PPOAgent(Agent):
 
         <fix: PPO for discrete action space>
             reference: https://github.com/takuseno/ppo/blob/master/build_graph.py
-        '''
+        """
         logits = self.actor(obs)
         logits = self.flatten_actions(logits)
 
@@ -164,7 +163,6 @@ class PPOAgent(Agent):
 
         s, a, r, d = self.process_batch()
         values = self.critic(s).reshape(-1)
-
         # ----------------------------
         # step 1: get returns and GAEs and log probability of old policy
         returns, advantages = self.get_gae(r, d, values)
