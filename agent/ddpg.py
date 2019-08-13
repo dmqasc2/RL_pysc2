@@ -173,14 +173,19 @@ class DDPGAgent(Agent):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(param.data)
 
-    def save_models(self, fname):
+        def save_models(self, fname, save_dir='results'):
         """
         saves the target actor and critic models
         :param episode_count: the count of episodes iterated
         :return:
         """
-        torch.save(self.target_actor.state_dict(), str(fname) + '_actor.pt')
-        torch.save(self.target_critic.state_dict(), str(fname) + '_critic.pt')
+        os.makedirs(save_dir, exist_ok=True)
+
+        actor_file = os.path.join(save_dir, str(fname) + '_actor.pt')
+        critic_file = os.path.join(save_dir, str(fname) + '_critic.pt')
+
+        torch.save(self.target_actor.state_dict(), actor_file)
+        torch.save(self.target_critic.state_dict(), critic_file)
         print('Models saved successfully')
 
     def load_models(self, fname):
