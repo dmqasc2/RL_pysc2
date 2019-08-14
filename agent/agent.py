@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from pysc2.lib import actions
 from torch.nn.functional import gumbel_softmax
+from torch.distributions import Categorical
 from utils import arglist
 
 
@@ -43,11 +44,55 @@ class Agent(object):
             obs_torch[o] = torch.from_numpy(x).to(arglist.DEVICE)
 
         logits = self.actor(obs_torch)
-        logits[0] = self._mask_unavailable_actions(logits['categorical'], valid_actions)
-        tau = 1.0
-        function_id = gumbel_softmax(logits['categorical'], tau=tau, hard=True)
-        function_id = function_id.argmax().item()
+        prob_categorical = torch.nn.Softmax(dim=-1)(logits['categorical'])
+        prob_categorical = self._mask_unavailable_actions(prob_categorical, valid_actions)
+        dist = Categorical(prob_categorical)
+        function_id = dist.sample().item()
 
+        is_valid_action = self._test_valid_action(function_id, valid_actions)
+        while not is_valid_action:
+            function_id = dist.sample().item()
+            is_valid_action = self._test_valid_action(function_id, valid_actions)
+
+        p = torch.nn.Softmax(dim=-1)(logits['screen1'].view(1, -1))
+        pos_screen1 = Categorical(p).sample().item()
+        p = torch.nn.Softmax(dim=-1)(logits['screen2'].view(1, -1))
+        pos_screen2 = Categorical(p).sample().item()
+
+        pos = [[int(pos_screen1 % arglist.FEAT2DSIZE), int(pos_screen1 // arglist.FEAT2DSIZE)],
+               [int(pos_screen2 % arglist.FEAT2DSIZE), int(pos_screen2 // arglist.FEAT2DSIZE)]]  # (x, y)
+
+        args = []
+        cnt = 0
+        for arg in actions.FUNCTIONS[function_id].args:
+            if arg.name in ['screen', 'screen2', 'minimap']:
+                args.append(pos[cnt])
+                cnt += 1
+            else:
+                args.append([0])
+
+        action = actions.FunctionCall(function_id, args)
+        return action
+
+    @DeprecationWarning
+    def select_action_old(self, obs, valid_actions):
+        '''
+        from logit to pysc2 actions
+        :param logits: {'categorical': [], 'screen1': [], 'screen2': []}
+        :return: FunctionCall form of action
+        '''
+        obs_torch = {'categorical': 0, 'screen1': 0, 'screen2': 0}
+        for o in obs:
+            x = obs[o].astype('float32')
+            x = np.expand_dims(x, 0)
+            obs_torch[o] = torch.from_numpy(x).to(arglist.DEVICE)
+
+        logits = self.actor(obs_torch)
+        logits['categorical'] = self._mask_unavailable_actions(logits['categorical'], valid_actions)
+        tau = 1.0
+        function_id = gumbel_softmax(logits['categorical'], tau=1e-10, hard=True)
+        function_id = function_id.argmax().item()
+        logits['categorical'].cpu().item()
         # select an action until it is valid.
         is_valid_action = self._test_valid_action(function_id, valid_actions)
         while not is_valid_action:

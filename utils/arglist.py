@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from pysc2.lib import actions
 
-DEVICE = torch.device('cuda:0')
+DEVICE = torch.device('cuda')
 
 SEED = 1234
 FEAT2DSIZE = 64

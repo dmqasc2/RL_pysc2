@@ -4,6 +4,8 @@ import copy
 from torch.nn.functional import gumbel_softmax
 from utils import arglist
 from agent.agent import Agent
+import os
+import time
 
 
 class DDPGAgent(Agent):
@@ -36,40 +38,51 @@ class DDPGAgent(Agent):
         replays = self.memory.sample(arglist.DDPG.BatchSize)
 
         # initialize batch experience
-        batch = {'state0': {'minimap': [], 'screen': [], 'nonspatial': []},
-                 'action': {'categorical': [], 'screen1': [], 'screen2': []},
-                 'reward': [],
-                 'state1': {'minimap': [], 'screen': [], 'nonspatial': []},
-                 'terminal1': [],
-                 }
+        # batch = {'state0': {'minimap': [], 'screen': [], 'nonspatial': []},
+        #          'action': {'categorical': [], 'screen1': [], 'screen2': []},
+        #          'reward': [],
+        #          'state1': {'minimap': [], 'screen': [], 'nonspatial': []},
+        #          'terminal1': [],
+        #          }
+
+        state0 = {'minimap': [], 'screen': [], 'nonspatial': []}
+        action = {'categorical': [], 'screen1': [], 'screen2': []}
+        reward = []
+        state1 = {'minimap': [], 'screen': [], 'nonspatial': []}
+        terminal1 = []
+
         # append experience to list
         for e in replays:
             # state0
             for k, v in e.state0[0].items():
-                batch['state0'][k].append(v)
+                v = torch.as_tensor(v, dtype=torch.float32)
+                state0[k].append(v)
             # action
             for k, v in e.action.items():
-                batch['action'][k].append(v)
+                v = torch.as_tensor(v, dtype=torch.float32)
+                action[k].append(v)
             # reward
-            batch['reward'].append(e.reward)
+            v = torch.as_tensor(e.reward, dtype=torch.float32)
+            reward.append(v)
             # state1
             for k, v in e.state1[0].items():
-                batch['state1'][k].append(v)
+                v = torch.as_tensor(v, dtype=torch.float32)
+                state1[k].append(v)
             # terminal1
-            batch['terminal1'].append(0. if e.terminal1 else 1.)
+            v = torch.as_tensor(0. if e.terminal1 else 1., dtype=torch.float32)
+            terminal1.append(v)
 
-        # make torch tensor
-        for key in batch.keys():
-            if type(batch[key]) is dict:
-                for subkey in batch[key]:
-                    x = torch.tensor(batch[key][subkey], dtype=torch.float32)
-                    batch[key][subkey] = x.to(self.device)
-            else:
-                x = torch.tensor(batch[key], dtype=torch.float32)
-                x = torch.squeeze(x)
-                batch[key] = x.to(self.device)
+        # stacking & send to GPU
+        for k in state0.keys():
+            state0[k] = torch.stack(state0[k]).to(self.device)
+        for k in state1.keys():
+            state1[k] = torch.stack(state1[k]).to(self.device)
+        for k in action.keys():
+            action[k] = torch.stack(action[k]).to(self.device)
+        reward = torch.tensor(reward).to(self.device)
+        terminal1 = torch.tensor(terminal1).to(self.device)
 
-        return batch['state0'], batch['action'], batch['reward'], batch['state1'], batch['terminal1']
+        return state0, action, reward, state1, terminal1
 
     def gumbel_softmax_hard(self, x):
         shape = x.shape
@@ -173,7 +186,7 @@ class DDPGAgent(Agent):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(param.data)
 
-        def save_models(self, fname, save_dir='results'):
+    def save_models(self, fname, save_dir='results'):
         """
         saves the target actor and critic models
         :param episode_count: the count of episodes iterated

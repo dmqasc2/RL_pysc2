@@ -39,7 +39,6 @@ class MiniGame:
                 self.learner.memory.append(obs, actions, state.reward, state.last(), training=is_training)
 
                 if state.last():
-                    print(t)
                     f = open("DDPG_result.txt", "a")
                     last_re = state.reward
                     cum_reward = state.observation["score_cumulative"]
@@ -49,8 +48,6 @@ class MiniGame:
                     break
                 else:
                     state = deepcopy(state_new)
-
-            time.sleep(0.5)
 
             if (i_episode + 1) % 10000 == 0:
                 self.learner.save_models(fname=i_episode)
