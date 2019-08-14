@@ -20,6 +20,7 @@ class MiniGame:
         self.env = sc2_env.SC2Env(map_name=self.map_name,
                                   step_mul=8,
                                   visualize=False,
+                                  game_steps_per_episode=1000,
                                   agent_interface_format=[agent_format])
         self.learner = learner
         self.preprocess = preprocess
@@ -44,7 +45,7 @@ class MiniGame:
                 obs = self.preprocess.get_observation(state)
                 actions = self.learner.select_action(obs, valid_actions=obs['nonspatial'])
                 state_new = self.env.step(actions=[actions])[0]
-
+                # print(actions)
                 # append memory
                 actions = self.preprocess.postprocess_action(actions)
                 self.learner.memory.append(obs, actions, state.reward, state.last(), training=is_training)

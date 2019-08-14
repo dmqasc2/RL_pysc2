@@ -44,19 +44,27 @@ class Agent(object):
             obs_torch[o] = torch.from_numpy(x).to(arglist.DEVICE)
 
         logits = self.actor(obs_torch)
-        prob_categorical = torch.nn.Softmax(dim=-1)(logits['categorical'])
+        prob_categorical = torch.nn.Softmax(dim=-1)(logits['categorical']).detach()
         prob_categorical = self._mask_unavailable_actions(prob_categorical, valid_actions)
         dist = Categorical(prob_categorical)
-        function_id = dist.sample().item()
+
+        function_id = None
+        while True:
+            try:
+                function_id = dist.sample().item()
+            except RuntimeError:
+                print('.')
+            if function_id is not None:
+                break
 
         is_valid_action = self._test_valid_action(function_id, valid_actions)
         while not is_valid_action:
             function_id = dist.sample().item()
             is_valid_action = self._test_valid_action(function_id, valid_actions)
 
-        p = torch.nn.Softmax(dim=-1)(logits['screen1'].view(1, -1))
+        p = torch.nn.Softmax(dim=-1)(logits['screen1'].view(1, -1)).detach()
         pos_screen1 = Categorical(p).sample().item()
-        p = torch.nn.Softmax(dim=-1)(logits['screen2'].view(1, -1))
+        p = torch.nn.Softmax(dim=-1)(logits['screen2'].view(1, -1)).detach()
         pos_screen2 = Categorical(p).sample().item()
 
         pos = [[int(pos_screen1 % arglist.FEAT2DSIZE), int(pos_screen1 // arglist.FEAT2DSIZE)],

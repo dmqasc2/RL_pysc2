@@ -1,77 +1,217 @@
 None
-step: 20, score: 11
-step: 44, score: 16
-step: 277, score: 57
-step: 541, score: 82
-step: 807, score: 57
-step: 865, score: 57
-step: 889, score: 16
-step: 941, score: 67
-step: 969, score: 26
-step: 999, score: 26
-step: 1052, score: 57
-step: 1280, score: 36
-step: 1302, score: 31
-step: 1323, score: 21
-step: 1341, score: 11
-step: 1562, score: 11
-step: 1816, score: 62
-step: 1836, score: 31
-step: 2525, score: 16
-step: 2749, score: 11
-step: 2791, score: 16
-step: 3014, score: 31
-step: 3033, score: 11
-step: 3054, score: 16
-step: 3090, score: 26
-step: 3114, score: 21
-step: 3142, score: 31
-step: 3163, score: 6
-step: 3226, score: 36
-step: 3256, score: 26
-step: 3477, score: 26
-step: 3492, score: 11
-step: 3510, score: 6
-step: 3532, score: 21
-step: 3560, score: 26
-step: 3586, score: 31
-step: 3809, score: 6
-step: 3844, score: 26
-step: 3864, score: 11
-step: 3934, score: 11
-step: 3983, score: 51
-step: 4163, score: 67
-step: 4490, score: 72
-step: 4560, score: 52
-step: 4573, score: 6
-step: 4595, score: 16
-step: 4623, score: 21
-step: 4853, score: 11
-step: 4878, score: 6
-step: 4892, score: 26
-step: 5507, score: 16
-step: 5740, score: 26
-step: 5764, score: 16
-step: 5791, score: 26
-step: 6044, score: 26
-step: 6075, score: 26
-step: 6147, score: 62
-step: 6167, score: 26
-step: 6193, score: 31
-step: 6235, score: 16
-step: 6264, score: 26
-step: 6282, score: 21
-step: 6320, score: 16
-step: 6357, score: 11
-step: 6389, score: 16
-step: 6414, score: 11
-step: 6431, score: 11
-step: 6452, score: 21
-step: 7069, score: 16
-step: 7088, score: 11
-step: 7102, score: 11
-step: 7128, score: 6
-step: 7152, score: 21
-step: 7171, score: 21
-step: 7192, score: 16
-step: 7217, score: 11
+episde: 0, step: 24, score: 16
+episde: 1, step: 62, score: 31
+episde: 2, step: 187, score: 21
+episde: 3, step: 222, score: 16
+episde: 4, step: 255, score: 16
+episde: 5, step: 276, score: 16
+episde: 6, step: 300, score: 31
+episde: 7, step: 346, score: 31
+episde: 8, step: 370, score: 31
+episde: 9, step: 495, score: 16
+episde: 10, step: 541, score: 77
+episde: 11, step: 602, score: 52
+episde: 12, step: 657, score: 72
+episde: 13, step: 700, score: 57
+episde: 14, step: 734, score: 26
+episde: 15, step: 753, score: 26
+episde: 16, step: 780, score: 16
+episde: 17, step: 804, score: 16
+episde: 18, step: 829, score: 31
+episde: 19, step: 954, score: 21
+episde: 20, step: 969, score: 16
+episde: 21, step: 986, score: 26
+episde: 22, step: 1039, score: 77
+episde: 23, step: 1063, score: 31
+episde: 24, step: 1188, score: 11
+episde: 25, step: 1226, score: 16
+episde: 26, step: 1351, score: 26
+episde: 27, step: 1476, score: 16
+episde: 28, step: 1511, score: 31
+episde: 29, step: 1561, score: 57
+episde: 30, step: 1612, score: 57
+episde: 31, step: 1640, score: 26
+episde: 32, step: 1765, score: 11
+episde: 33, step: 1804, score: 57
+episde: 34, step: 1888, score: 67
+episde: 35, step: 1907, score: 16
+episde: 36, step: 2032, score: 21
+episde: 37, step: 2057, score: 31
+episde: 38, step: 2182, score: 21
+episde: 39, step: 2211, score: 11
+episde: 40, step: 2237, score: 6
+episde: 41, step: 2317, score: 67
+episde: 42, step: 2351, score: 31
+episde: 43, step: 2376, score: 16
+episde: 44, step: 2427, score: 62
+episde: 45, step: 2456, score: 26
+episde: 46, step: 2560, score: 47
+episde: 47, step: 2585, score: 21
+episde: 48, step: 2710, score: 16
+episde: 49, step: 2744, score: 31
+episde: 50, step: 2869, score: 21
+episde: 51, step: 2925, score: 31
+episde: 52, step: 2959, score: 26
+episde: 53, step: 2982, score: 11
+episde: 54, step: 3107, score: 57
+episde: 55, step: 3232, score: 26
+episde: 56, step: 3280, score: 52
+episde: 57, step: 3405, score: 6
+episde: 58, step: 3429, score: 16
+episde: 59, step: 3453, score: 21
+episde: 60, step: 3477, score: 16
+episde: 61, step: 3519, score: 36
+episde: 62, step: 3644, score: 26
+episde: 63, step: 3666, score: 21
+episde: 64, step: 3687, score: 21
+episde: 65, step: 3735, score: 57
+episde: 66, step: 3761, score: 31
+episde: 67, step: 3833, score: 77
+episde: 68, step: 3895, score: 62
+episde: 69, step: 4020, score: 31
+episde: 70, step: 4077, score: 31
+episde: 71, step: 4113, score: 16
+episde: 72, step: 4173, score: 57
+episde: 73, step: 4231, score: 6
+episde: 74, step: 4251, score: 6
+episde: 75, step: 4284, score: 11
+episde: 76, step: 4367, score: 62
+episde: 77, step: 4452, score: 52
+episde: 78, step: 4491, score: 26
+episde: 79, step: 4519, score: 31
+episde: 80, step: 4644, score: 21
+episde: 81, step: 4743, score: 57
+episde: 82, step: 4794, score: 62
+episde: 83, step: 4848, score: 26
+episde: 84, step: 4973, score: 31
+episde: 85, step: 5098, score: 47
+episde: 86, step: 5152, score: 31
+episde: 87, step: 5232, score: 31
+episde: 88, step: 5282, score: 21
+episde: 89, step: 5407, score: 44
+episde: 90, step: 5438, score: 26
+episde: 91, step: 5563, score: 48
+episde: 92, step: 5648, score: 26
+episde: 93, step: 5773, score: 38
+episde: 94, step: 5818, score: 36
+episde: 95, step: 5943, score: 31
+episde: 96, step: 5999, score: 26
+episde: 97, step: 6038, score: 26
+episde: 98, step: 6163, score: 16
+episde: 99, step: 6194, score: 26
+episde: 100, step: 6263, score: 16
+episde: 101, step: 6336, score: 16
+episde: 102, step: 6402, score: 16
+episde: 103, step: 6441, score: 26
+episde: 104, step: 6492, score: 26
+episde: 105, step: 6550, score: 77
+episde: 106, step: 6592, score: 26
+episde: 107, step: 6712, score: 72
+episde: 108, step: 6776, score: 57
+episde: 109, step: 6853, score: 31
+episde: 110, step: 6918, score: 31
+episde: 111, step: 6964, score: 11
+episde: 112, step: 6985, score: 26
+episde: 113, step: 7016, score: 26
+episde: 114, step: 7109, score: 26
+episde: 115, step: 7234, score: 16
+episde: 116, step: 7272, score: 11
+episde: 117, step: 7387, score: 47
+episde: 118, step: 7512, score: 0
+episde: 119, step: 7621, score: 67
+episde: 120, step: 7645, score: 21
+episde: 121, step: 7672, score: 21
+episde: 122, step: 7797, score: 26
+episde: 123, step: 7922, score: 35
+episde: 124, step: 8000, score: 26
+episde: 125, step: 8047, score: 11
+episde: 126, step: 8107, score: 26
+episde: 127, step: 8172, score: 52
+episde: 128, step: 8209, score: 26
+episde: 129, step: 8334, score: 21
+episde: 130, step: 8391, score: 11
+episde: 131, step: 8450, score: 16
+episde: 132, step: 8515, score: 26
+episde: 133, step: 8640, score: 62
+episde: 134, step: 8765, score: 45
+episde: 135, step: 8867, score: 21
+episde: 136, step: 8899, score: 21
+episde: 137, step: 9024, score: 33
+episde: 138, step: 9056, score: 36
+episde: 139, step: 9181, score: 45
+episde: 140, step: 9247, score: 26
+episde: 141, step: 9372, score: 44
+episde: 142, step: 9460, score: 21
+episde: 143, step: 9562, score: 31
+episde: 144, step: 9597, score: 31
+episde: 145, step: 9633, score: 21
+episde: 146, step: 9728, score: 61
+episde: 147, step: 9793, score: 36
+episde: 148, step: 9831, score: 36
+episde: 149, step: 9868, score: 11
+episde: 150, step: 9906, score: 6
+episde: 151, step: 9961, score: 26
+episde: 152, step: 9985, score: 26
+episde: 153, step: 10021, score: 31
+episde: 154, step: 10050, score: 26
+episde: 155, step: 10094, score: 36
+episde: 156, step: 10164, score: 57
+episde: 157, step: 10289, score: 54
+episde: 158, step: 10414, score: 42
+episde: 159, step: 10472, score: 16
+episde: 160, step: 10597, score: 44
+episde: 161, step: 10722, score: 21
+episde: 162, step: 10762, score: 26
+episde: 163, step: 10823, score: 31
+episde: 164, step: 10948, score: 88
+episde: 165, step: 11016, score: 16
+episde: 166, step: 11141, score: 61
+episde: 167, step: 11161, score: 26
+episde: 168, step: 11210, score: 11
+episde: 169, step: 11264, score: 31
+episde: 170, step: 11292, score: 11
+episde: 171, step: 11362, score: 26
+episde: 172, step: 11487, score: 42
+episde: 173, step: 11589, score: 67
+episde: 174, step: 11642, score: 36
+episde: 175, step: 11691, score: 16
+episde: 176, step: 11732, score: 26
+episde: 177, step: 11773, score: 31
+episde: 178, step: 11898, score: 21
+episde: 179, step: 11960, score: 65
+episde: 180, step: 12005, score: 1
+episde: 181, step: 12130, score: 29
+episde: 182, step: 12237, score: 16
+episde: 183, step: 12300, score: 6
+episde: 184, step: 12425, score: 11
+episde: 185, step: 12532, score: 57
+episde: 186, step: 12610, score: 59
+episde: 187, step: 12664, score: 16
+episde: 188, step: 12693, score: 16
+episde: 189, step: 12796, score: 67
+episde: 190, step: 12829, score: 31
+episde: 191, step: 12947, score: 113
+episde: 192, step: 13000, score: 21
+episde: 193, step: 13042, score: 11
+episde: 194, step: 13094, score: 26
+episde: 195, step: 13112, score: 21
+episde: 196, step: 13209, score: 31
+episde: 197, step: 13334, score: 38
+episde: 198, step: 13392, score: 31
+episde: 199, step: 13517, score: 16
+episde: 200, step: 13642, score: 9
+episde: 201, step: 13767, score: 31
+episde: 202, step: 13892, score: 43
+episde: 203, step: 14017, score: 36
+episde: 204, step: 14075, score: 31
+episde: 205, step: 14200, score: 67
+episde: 206, step: 14325, score: 46
+episde: 207, step: 14450, score: 17
+episde: 208, step: 14534, score: 31
+episde: 209, step: 14560, score: 31
+episde: 210, step: 14651, score: 72
+episde: 211, step: 14704, score: 16
+episde: 212, step: 14770, score: 62
+episde: 213, step: 14801, score: 21
+episde: 214, step: 14926, score: 31
+episde: 215, step: 15051, score: 37
