@@ -1,5 +1,5 @@
 import time
-
+import os
 from pysc2.env import sc2_env
 from utils import arglist
 from copy import deepcopy
@@ -13,20 +13,31 @@ agent_format = sc2_env.AgentInterfaceFormat(
 
 
 class MiniGame:
-    def __init__(self, map_name, learner, preprocess, nb_episodes=1000):
+    def __init__(self, map_name, learner, preprocess, nb_episodes=50000):
         self.map_name = map_name
-        self.nb_max_steps = 2000
+        self.nb_max_steps = 200
         self.nb_episodes = nb_episodes
         self.env = sc2_env.SC2Env(map_name=self.map_name,
-                                  step_mul=2,
+                                  step_mul=8,
                                   visualize=False,
                                   agent_interface_format=[agent_format])
         self.learner = learner
         self.preprocess = preprocess
 
+    def write_history(self, fname, msg=None):
+        fname = 'Models/' + fname
+
+        if not os.path.exists(fname) or msg is None:
+            f = open(fname, "w")
+        else:
+            f = open(fname, "a")
+        f.write(str(msg) + '\n')
+        f.close()
+
     def run_ddpg(self, is_training=True):
-        reward_cumulative = []
-        f = open("DDPG_result.txt", "w")
+        cum_reward_best = 0
+        self.write_history(self.map_name + '_history_ddpg.txt', msg=None)
+
         for i_episode in range(self.nb_episodes):
             state = self.env.reset()[0]
             for t in range(self.nb_max_steps):  # Don't infinite loop while learning
@@ -38,23 +49,24 @@ class MiniGame:
                 actions = self.preprocess.postprocess_action(actions)
                 self.learner.memory.append(obs, actions, state.reward, state.last(), training=is_training)
 
+                self.learner.optimize(is_train=self.learner.iter % 8 == 0)
+
                 if state.last():
-                    f = open("DDPG_result.txt", "a")
-                    last_re = state.reward
-                    cum_reward = state.observation["score_cumulative"]
-                    reward_cumulative.append(cum_reward[0])
-                    self.learner.optimize()
-                    f.write(f"reward: [{last_re}] score: [{cum_reward[0]}]\n")
+                    cum_reward = state.observation["score_cumulative"][0]
+                    # save networks
+                    if cum_reward >= cum_reward_best:
+                        self.learner.save_models(fname=self.map_name + '_ddpg')
+                        cum_reward_best = cum_reward
+
+                    # write cululative reward for every episodes
+                    self.write_history(fname=self.map_name + '_history_ddpg.txt',
+                                       msg='step: {}, score: {}'.format(self.learner.iter, cum_reward))
                     break
                 else:
                     state = deepcopy(state_new)
 
-            if (i_episode + 1) % 10000 == 0:
-                self.learner.save_models(fname=i_episode)
-
+                self.learner.iter += 1
         self.env.close()
-        f.close()
-        print(reward_cumulative)
 
     def run_ppo(self, is_training=True):
         reward_cumulative = []

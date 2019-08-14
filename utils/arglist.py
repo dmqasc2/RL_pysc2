@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from pysc2.lib import actions
 
-DEVICE = torch.device('cuda')
+DEVICE = torch.device('cuda:0')
 
 SEED = 1234
 FEAT2DSIZE = 64
@@ -22,9 +22,9 @@ observation_shape = {'minimap': (7, FEAT2DSIZE, FEAT2DSIZE),
 class DDPG:
     GAMMA = 0.99
     TAU = 0.001
-    LEARNINGRATE = 0.001
+    LEARNINGRATE = 0.0001
     BatchSize = 128
-    memory_limit = int(1e5)
+    memory_limit = int(5e5)
 
 
 # PPO parameters

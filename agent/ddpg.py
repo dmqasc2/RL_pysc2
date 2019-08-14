@@ -37,14 +37,6 @@ class DDPGAgent(Agent):
         """
         replays = self.memory.sample(arglist.DDPG.BatchSize)
 
-        # initialize batch experience
-        # batch = {'state0': {'minimap': [], 'screen': [], 'nonspatial': []},
-        #          'action': {'categorical': [], 'screen1': [], 'screen2': []},
-        #          'reward': [],
-        #          'state1': {'minimap': [], 'screen': [], 'nonspatial': []},
-        #          'terminal1': [],
-        #          }
-
         state0 = {'minimap': [], 'screen': [], 'nonspatial': []}
         action = {'categorical': [], 'screen1': [], 'screen2': []}
         reward = []
@@ -97,12 +89,12 @@ class DDPGAgent(Agent):
 
         return y
 
-    def optimize(self):
+    def optimize(self, is_train=True):
         """
         Samples a random batch from replay memory and performs optimization
         :return:
         """
-        if self.memory.nb_entries < arglist.DDPG.BatchSize * 10:
+        if self.memory.nb_entries < arglist.DDPG.BatchSize * 10 or not is_train:
             return 0, 0
 
         s0, a0, r, s1, d = self.process_batch()
@@ -138,7 +130,7 @@ class DDPGAgent(Agent):
             pred_a0[key] = self.gumbel_softmax_hard(value)
 
         # Loss: regularization
-        l2_reg = torch.cuda.FloatTensor(1)
+        l2_reg = torch.FloatTensor(1).to(self.device)
         for W in self.actor.parameters():
             l2_reg = l2_reg + W.norm(2)
 
@@ -161,6 +153,7 @@ class DDPGAgent(Agent):
         # Update target env
         self.soft_update(self.target_actor, self.actor, arglist.DDPG.TAU)
         self.soft_update(self.target_critic, self.critic, arglist.DDPG.TAU)
+
         return loss_actor, loss_critic
 
     def soft_update(self, target, source, tau):
@@ -186,13 +179,14 @@ class DDPGAgent(Agent):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(param.data)
 
-    def save_models(self, fname, save_dir='results'):
+    def save_models(self, fname, save_dir='Models'):
         """
         saves the target actor and critic models
         :param episode_count: the count of episodes iterated
         :return:
         """
-        os.makedirs(save_dir, exist_ok=True)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
 
         actor_file = os.path.join(save_dir, str(fname) + '_actor.pt')
         critic_file = os.path.join(save_dir, str(fname) + '_critic.pt')
