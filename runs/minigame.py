@@ -60,7 +60,7 @@ class MiniGame:
 
                     # write cululative reward for every episodes
                     self.write_history(fname=self.map_name + '_history_ddpg.txt',
-                                       msg='step: {}, score: {}'.format(self.learner.iter, cum_reward))
+                                       msg='episde: {}, step: {}, score: {}'.format(i_episode, self.learner.iter, cum_reward))
                     break
                 else:
                     state = deepcopy(state_new)
