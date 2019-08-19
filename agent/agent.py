@@ -48,14 +48,10 @@ class Agent(object):
         prob_categorical = self._mask_unavailable_actions(prob_categorical, valid_actions)
         dist = Categorical(prob_categorical)
 
-        function_id = None
-        while True:
-            try:
-                function_id = dist.sample().item()
-            except RuntimeError:
-                print('.')
-            if function_id is not None:
-                break
+        try:
+            function_id = dist.sample().item()
+        except RuntimeError:
+            function_id = 0
 
         is_valid_action = self._test_valid_action(function_id, valid_actions)
         while not is_valid_action:

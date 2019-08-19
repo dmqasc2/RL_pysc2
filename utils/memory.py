@@ -403,5 +403,3 @@ if __name__ == '__main__':
 
     ## sample
     x = mem.sample()
-
-
