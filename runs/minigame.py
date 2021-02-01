@@ -19,6 +19,7 @@ class MiniGame:
         self.nb_episodes = nb_episodes
         self.env = sc2_env.SC2Env(map_name=self.map_name,
                                   step_mul=8,
+                                  players=[sc2_env.Agent(sc2_env.Race.terran)],
                                   visualize=False,
                                   game_steps_per_episode=1000,
                                   agent_interface_format=[agent_format])
